@@ -3,17 +3,20 @@
 
 class CtrUnit{
 public:
-	bool RegDst;
+
 	bool Jump;
+
+	bool RegDst;
+	bool ALUop[2];
+	bool ALUSrc;
+
 	bool Branch;
 	bool MemRead;
-	bool MemtoReg;
-	bool ALUop[2];
 	bool MemWrite;
-	bool ALUSrc;
+	
+	bool MemtoReg;
 	bool RegWrite;
-
-	CtrUnit(unsigned char opcode);
+	CtrUnit(unsigned int inst);
 };
 
 #endif

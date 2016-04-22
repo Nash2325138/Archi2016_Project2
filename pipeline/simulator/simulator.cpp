@@ -7,6 +7,7 @@
 #include "./instruction.h"
 #include "./regfile.h"
 #include "./memory.h"
+#include "./ctrUnit.h"
 
 #define DEBUG_CYCLE 999999
 
@@ -18,6 +19,7 @@ InstructionMemery* instructions;
 Registers* regs;
 unsigned int PC;
 int cycle;
+CtrUnit * (ctrUnit)[10];
 
 std::vector<unsigned int>* readImage(FILE *);
 void readInput_initialize(void);
@@ -25,6 +27,13 @@ void print_snapshot(void);
 int execute(void);
 void destroy_all(void);
 void sumOverflow(int aluValue1, int aluValue2);
+CtrUnit * getEmptyCtrUnit(void)
+{
+	for(int i=0 ; i<10 ; i++){
+		if(ctrUnit[i]->used == false) return ctrUnit[i];
+	}
+	return NULL;
+}
 
 int main(int argc, char const *argv[])
 {
@@ -95,6 +104,9 @@ void readInput_initialize(void)
 	regs = new Registers(sp);
 	//for(unsigned int i=0 ; i<regs->size() ; i++)	printf("%d: %x\n", i, regs->at(i));
 	//printf("\n");
+	for(int i=0 ; i<10 ; i++){
+		ctrUnit[i] = new CtrUnit();
+	}
 }
 
 int execute(void)
@@ -465,6 +477,7 @@ void destroy_all(void)
 	delete memory;
 	delete instructions;
 	delete regs;
+	for(int i=0 ; i<10 ; i++) delete ctrUnit[i];
 
 	fclose(snapshot);
 	fclose(error_dump);

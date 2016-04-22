@@ -3,6 +3,7 @@
 
 class CtrUnit{
 public:
+	bool used;
 
 	bool Jump;
 
@@ -16,7 +17,9 @@ public:
 	
 	bool MemtoReg;
 	bool RegWrite;
+	CtrUnit(void);
 	CtrUnit(unsigned int inst);
+	void change(unsigned int inst);
 };
 
 #endif

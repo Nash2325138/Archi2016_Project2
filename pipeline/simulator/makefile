@@ -1,5 +1,5 @@
 CC = g++ -std=c++11 -Wall
-ALL_OBJ = simulator.o instruction.o regfile.o memory.o ctrUnit.o
+ALL_OBJ = simulator.o instruction.o regfile.o memory.o ctrUnit.o stageBuffer.o
 simulator: ${ALL_OBJ}
 	${CC} -o pipeline ${ALL_OBJ}
 allObj: ./*cpp
@@ -14,6 +14,8 @@ memory.o: memory.cpp
 	${CC} -c memory.cpp
 ctrUnit.o: ctrUnit.cpp
 	${CC} -c ctrUnit.cpp
+stageBuffer.o: stageBuffer.cpp
+	${CC} -c stageBuffer.cpp
 clean:
 	rm -f pipeline ${ALL_OBJ}
 

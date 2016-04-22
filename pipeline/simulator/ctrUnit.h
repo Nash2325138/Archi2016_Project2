@@ -1,5 +1,6 @@
 #ifndef CTRUNIT_H
 #define CTRUNIT_H
+#include <cstdio>
 
 class CtrUnit{
 public:
@@ -18,8 +19,8 @@ public:
 	bool MemtoReg;
 	bool RegWrite;
 	CtrUnit(void);
-	CtrUnit(unsigned int inst);
 	void change(unsigned int inst);
+	void print_all(void);
 };
 
 #endif

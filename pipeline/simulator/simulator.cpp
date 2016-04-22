@@ -113,7 +113,13 @@ int execute(void)
 {
 	int toReturn = 0;
 	if(cycle==DEBUG_CYCLE) printf("PC==%d, ", PC);
+	
 	unsigned int inst = instructions->at(PC/4);
+	CtrUnit *control = getEmptyCtrUnit();
+	control->change(inst);
+	control->print_all();
+	control->used = false;
+
 	PC += 4;
 	//printf("inst==%x  ", inst);
 	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits

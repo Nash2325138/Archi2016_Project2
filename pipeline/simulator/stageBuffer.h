@@ -30,6 +30,7 @@ public:
 	unsigned int PC_puls_4;
 	CtrUnit *control;
 
+	// for a lazy reason, the following 3 argument are forwarded to use project 1 code 
 	unsigned char opcode;
 	unsigned char funct;
 	unsigned char shamt;

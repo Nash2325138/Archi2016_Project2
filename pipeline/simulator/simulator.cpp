@@ -69,6 +69,341 @@ void stage_decode(void)
 	ID_EX_buffer.rs_data = (int) regs->at(IF_ID_buffer.rs);
 	ID_EX_buffer.rt_data = (int) regs->at(IF_ID_buffer.rt);
 	ID_EX_buffer.extented_immediate = (signed)IF_ID_buffer.immediate;
+
+	ID_EX_buffer.rt = IF_ID_buffer.rt;
+	ID_EX_buffer.rd = IF_ID_buffer.rd;
+}
+
+int stage_execute(void)
+{
+	// EX_MEM_buffer. = ID_EX_buffer.
+	EX_MEM_buffer.PC_result = ID_EX_buffer.PC_puls_4 + (ID_EX_buffer.extented_immediate << 2);
+
+	int aluValue1 = ID_EX_buffer.rs_data;
+	int aluValue2 = (ID_EX_buffer.control->ALUSrc) ? ID_EX_buffer.extented_immediate : ID_EX_buffer.rt_data;
+	int alu_result;
+
+	if(ID_EX_buffer.opcode == 0x00){
+		/*if(funct != 0x08 && rd==0){								// 0x08 means jr
+			if(funct == 0x00 && rt==0 && rd==0 && shamt==0 ) {}		// sll $0, $0, 0 is a NOP
+			else fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
+			toReturn = 1;
+		}*/
+		switch(ID_EX_buffer.funct)
+		{
+
+			case 0x20:	// add
+				//if(toReturn!=0) return toReturn;
+				sumOverflow(aluValue1, aluValue2);
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x21:	// addu
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x22:	// sub
+				aluValue2 = (~(aluValue2))+1;
+				sumOverflow(aluValue1, aluValue2);
+				//if(toReturn!=0) return toReturn;
+				
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x24:	// and
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 & aluValue2;
+				break;
+
+			case 0x25:	// or
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 | aluValue2;
+				break;
+
+			case 0x26:	//xor
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 ^ aluValue2;
+				break;
+
+			case 0x27:	//nor
+				//if(toReturn!=0) return toReturn;
+				alu_result = ~(aluValue1 | aluValue2);
+				break;
+
+			case 0x28:	//nand
+				//if(toReturn!=0) return toReturn;
+				alu_result = ~(aluValue1 & aluValue2);
+				break;
+
+			case 0x2a:	//slt
+				//if(toReturn!=0) return toReturn;
+				alu_result = ( aluValue1 < aluValue2 ) ? 1:0;
+				break;
+
+			case 0x00:	//sll
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 << ID_EX_buffer.shamt;
+				break;
+
+			case 0x02:	//srl
+				//if(toReturn!=0) return toReturn;
+				alu_result = ((unsigned int)aluValue1) >> ID_EX_buffer.shamt;
+				break;
+
+			case 0x03:	//sra
+				//if(toReturn!=0) return toReturn;
+				alu_result = ((int)aluValue1) >> ID_EX_buffer.shamt;
+				break;
+
+			case 0x08:	//jr
+				break;
+
+			default: break;
+		}
+	} else {
+		//if(cycle==DEBUG_CYCLE) printf("rs==%d, rt==%d, immediate==%d\n\n", rs, rt, immediate);
+		/*if(rt==0){
+			if(opcode!=0x2B && opcode!=0x29 && opcode!=0x28 && opcode!=0x04 && opcode!=0x05 && opcode!=0x07){
+				if(opcode!=0x02 && opcode!=0x03 && opcode!=0x3F){
+					fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
+					toReturn = 1;
+				}
+			}		
+		}*/
+
+		//int aluValue1 = (int)regs->at(rs);
+		//int aluValue2 = (signed short)immediate;
+		//unsigned int location = (regs->at(rs) + ((signed short)immediate) );
+		switch(ID_EX_buffer.opcode)
+		{
+			//--------------------------- I type start -----------------------------//
+			case 0x08: 	// addi
+				sumOverflow(aluValue1, aluValue2);
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x09:	// addiu
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x23:	//lw
+				sumOverflow(aluValue1, aluValue2);
+				/*if ( location >1020 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 4 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;*/
+
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x21:	//lh
+				sumOverflow(aluValue1, aluValue2);
+				/*if( location > 1022) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				if(location%4==0) halfLoaded = (signed short) ( (memory->at(location/4)) >> 16);
+				else if(location%2==0) halfLoaded = (signed short) ( (memory->at(location/4)) & 0x0000ffff );
+				regs->at(rt) = (signed short)halfLoaded;		// <-------- this line is very important!!!*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x25:	//lhu 
+				sumOverflow(aluValue1, aluValue2);
+				/*if( location > 1022) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				if(location%4==0) halfLoaded = (unsigned short) ( ((unsigned int)(memory->at(location/4))) >> 16);
+				else if(location%2==0) halfLoaded = (unsigned short) ( (memory->at(location/4)) & 0x0000ffff );
+				regs->at(rt) = (unsigned short)halfLoaded;*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x20:	//lb 
+				sumOverflow(aluValue1, aluValue2);
+				/*if( location > 1023) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				byteLoaded = (signed char) ( ((unsigned int)(memory->at(location/4))) >> (
+																													(location%4==0) ? 24 :
+																													(location%4==1) ? 16 :
+																													(location%4==2) ? 8  :
+																													(location%4==3) ? 0 : 0) ) & 0x000000ff; 
+
+				regs->at(rt) = (signed char)byteLoaded;*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x24:	//lbu
+				sumOverflow(aluValue1, aluValue2);
+				/*if( location > 1023 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				byteLoaded = (unsigned char) (((unsigned int)(memory->at(location/4))) >> (
+																													(location%4==0) ? 24 :
+																													(location%4==1) ? 16 :
+																													(location%4==2) ? 8  :
+																													(location%4==3) ? 0 : 0) ) & 0x000000ff; 
+
+				regs->at(rt) = (unsigned char)byteLoaded;*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x2B:	//sw
+				sumOverflow(aluValue1, aluValue2);
+				/*if ( location >1020 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 4 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				memory->at(location/4) = regs->at(rt);*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x29:	//sh
+				sumOverflow(aluValue1, aluValue2);
+				/*if ( location >1022 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				
+				memory->at(location/4) &= (	(location%4==0) ? 0x0000ffff :
+																		(location%4==2) ? 0xffff0000 : 0xffff0000 );
+				tempValue = regs->at(rt) & 0x0000ffff;
+				tempValue <<= (	(location%4==0) ? 16 :
+												(location%4==2) ? 0  : 0 );
+				memory->at(location/4) |= tempValue;*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x28:	//sb
+				sumOverflow(aluValue1, aluValue2);
+				/*if ( location >1023 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				
+				memory->at(location/4) &= (	(location%4==0) ? 0x00ffffff :
+																		(location%4==1) ? 0xff00ffff :
+																		(location%4==2) ? 0xffff00ff :
+																		(location%4==3) ? 0xffffff00 : 0xffffff00 );
+				tempValue = regs->at(rt) & 0x000000ff;
+				tempValue <<= (	(location%4==0) ? 24 :
+												(location%4==1) ? 16 :
+												(location%4==2) ? 8  :
+												(location%4==3) ? 0  : 0 );
+				memory->at(location/4) |= tempValue;*/
+				alu_result = aluValue1 + aluValue2;
+				break;
+
+			case 0x0F:	//lui 
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue2 << 16;
+				break;
+
+			case 0x0C:	//andi 
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 & aluValue2;
+				break;
+
+			case 0x0D:	//ori 
+				//if(toReturn!=0) return toReturn;
+				alu_result = aluValue1 | aluValue2;
+				break;
+
+			case 0x0E:	//nori 
+				//if(toReturn!=0) return toReturn;
+				alu_result = ~( aluValue1 | aluValue2 );
+				break;
+			
+			case 0x0A:	//slti
+				//if(toReturn!=0) return toReturn;
+				if( aluValue1 < aluValue2 ) alu_result = 1;
+				else alu_result = 0;
+				break;
+
+			// ---------- in project 2, branch and jump should be done at ID stage !!!! ---------- //
+			case 0x04:	//beq
+				//if(toReturn!=0) return toReturn;
+				EX_MEM_buffer.ALU_zero = ( aluValue1==aluValue2 ) ? true : false;
+				break;
+
+			case 0x05:	//bne 
+				//if(toReturn!=0) return toReturn;
+				EX_MEM_buffer.ALU_zero = ( aluValue1!=aluValue2 ) ? true : false;
+				break;
+			
+			case 0x07:	//bgtz 
+				//if(toReturn!=0) return toReturn;
+				EX_MEM_buffer.ALU_zero = ( aluValue1 > 0 ) ? true : false;
+				break;
+			//--------------------------- I type end -----------------------------//
+
+
+			//--------------------------- J type start -----------------------------//
+			case 0x02:	//j
+				//if(toReturn!=0) return toReturn;
+				//PC &= 0xf0000000;
+				//PC |= ( ((unsigned int)address) << 2 );
+				break;
+
+			case 0x03:	//jal
+				//if(toReturn!=0) return toReturn;
+				//regs->at(31) = PC;
+				//PC &= 0xf0000000;
+				//PC |= ( ((unsigned int)address) << 2 );
+				break;
+			//--------------------------- J type end -----------------------------//
+
+
+			
+			case 0x3f:	// halt
+				return -1;
+				break;
+			default:
+				fputs("no such instruction", stderr);
+				break;
+		}
+	}
+	EX_MEM_buffer.ALU_result = alu_result;
+	return 1;
 }
 
 int main(int argc, char const *argv[])

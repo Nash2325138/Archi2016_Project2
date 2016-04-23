@@ -403,6 +403,17 @@ int stage_execute(void)
 		}
 	}
 	EX_MEM_buffer.ALU_result = alu_result;
+	EX_MEM_buffer.rt_data = ID_EX_buffer.rt_data;
+
+	EX_MEM_buffer.write_destination = (ID_EX_buffer.control->RegDst) ? ID_EX_buffer.rd : ID_EX_buffer.rt;
+	return 1;
+}
+int stage_memory(void)
+{
+	if(EX_MEM_buffer.control->MemWrite){
+		//memory->at(EX_MEM_buffer.ALU_result)
+	}
+
 	return 1;
 }
 

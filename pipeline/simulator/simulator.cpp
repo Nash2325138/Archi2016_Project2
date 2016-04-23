@@ -404,14 +404,71 @@ int stage_execute(void)
 	}
 	EX_MEM_buffer.ALU_result = alu_result;
 	EX_MEM_buffer.rt_data = ID_EX_buffer.rt_data;
+	EX_MEM_buffer.opcode = ID_EX_buffer.opcode;
 
 	EX_MEM_buffer.write_destination = (ID_EX_buffer.control->RegDst) ? ID_EX_buffer.rd : ID_EX_buffer.rt;
 	return 1;
 }
 int stage_memory(void)
 {
+	int location = EX_MEM_buffer.ALU_result;
+	int rt_data = EX_MEM_buffer.rt_data;
+	int tempValue, toReturn=0;
 	if(EX_MEM_buffer.control->MemWrite){
 		//memory->at(EX_MEM_buffer.ALU_result)
+		switch(EX_MEM_buffer.opcode)
+		{
+			case 0x2B:	//sw
+				if ( location >1020 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 4 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				memory->at(location/4) = rt_data;
+				break;
+
+			case 0x29:	//sh
+				if ( location >1022 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				
+				memory->at(location/4) &= (	(location%4==0) ? 0x0000ffff :
+											(location%4==2) ? 0xffff0000 : 0xffff0000 );
+				tempValue = rt_data & 0x0000ffff;
+				tempValue <<= (	(location%4==0) ? 16 :
+								(location%4==2) ? 0  : 0 );
+				memory->at(location/4) |= tempValue;
+				break;
+
+			case 0x28:	//sb
+				if ( location >1023 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				
+				memory->at(location/4) &= (	(location%4==0) ? 0x00ffffff :
+											(location%4==1) ? 0xff00ffff :
+											(location%4==2) ? 0xffff00ff :
+											(location%4==3) ? 0xffffff00 : 0xffffff00 );
+				tempValue = rt_data & 0x000000ff;
+				tempValue <<= (	(location%4==0) ? 24 :
+								(location%4==1) ? 16 :
+								(location%4==2) ? 8  :
+								(location%4==3) ? 0  : 0 );
+				memory->at(location/4) |= tempValue;
+				break;
+		}
 	}
 
 	return 1;

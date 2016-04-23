@@ -56,6 +56,8 @@ public:
 	int ALU_result;
 	int rt_data;
 
+	unsigned char opcode;
+
 	unsigned char write_destination;
 };
 

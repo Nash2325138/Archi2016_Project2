@@ -8,6 +8,7 @@
 #include "./regfile.h"
 #include "./memory.h"
 #include "./ctrUnit.h"
+#include "./stageBuffer.h"
 
 #define DEBUG_CYCLE 999999
 
@@ -21,6 +22,11 @@ unsigned int PC;
 int cycle;
 CtrUnit * (ctrUnit)[10];
 
+IF_ID_Buffer IF_ID_buffer;
+ID_EX_Buffer ID_EX_buffer;
+EX_MEM_Buffer EX_MEM_buffer;
+MEM_WB_Buffer MEM_WB_buffer;
+
 std::vector<unsigned int>* readImage(FILE *);
 void readInput_initialize(void);
 void print_snapshot(void);
@@ -33,6 +39,19 @@ CtrUnit * getEmptyCtrUnit(void)
 		if(ctrUnit[i]->used == false) return ctrUnit[i];
 	}
 	return NULL;
+}
+void fetch(void)
+{
+	// PCSrc == 1 ?
+	if(EX_MEM_buffer.control->Branch && EX_MEM_buffer.ALU_zero){
+		PC = EX_MEM_buffer.PC_result;
+	} else {
+		// PC value remains
+	}
+	unsigned int inst = instructions->at(PC/4);
+	CtrUnit *control = getEmptyCtrUnit();
+	PC = PC + 4;
+	IF_ID_buffer.put(inst, control, PC);
 }
 
 int main(int argc, char const *argv[])

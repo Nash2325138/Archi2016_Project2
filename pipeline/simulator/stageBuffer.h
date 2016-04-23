@@ -20,7 +20,7 @@ public:
 	unsigned short immediate;
 	unsigned int address;
 
-	void put(unsigned int inst, CtrUnit *control_in);
+	void put(unsigned int inst_in, CtrUnit *control_in, unsigned int PC_p_4);
 };
 
 class ID_EX_Buffer
@@ -61,7 +61,8 @@ public:
 class MEM_WB_Buffer
 {
 public:
-	unsigned int 
+	int ALU_result;
+	int memory_result;
 };
 
 #endif

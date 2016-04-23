@@ -1,6 +1,6 @@
 #include "stageBuffer.h"
 
-void IF_ID_Buffer::put(unsigned int inst, CtrUnit *control_in)
+void IF_ID_Buffer::put(unsigned int inst_in, CtrUnit *control_in, unsigned int PC_p_4)
 {
 	/*
 	unsigned int inst;
@@ -17,7 +17,9 @@ void IF_ID_Buffer::put(unsigned int inst, CtrUnit *control_in)
 	unsigned short immediate;
 	unsigned int address;
 	*/
+	inst = inst_in;
 	this->control = control_in;
+	PC_puls_4 = PC_p_4;
 
 	opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
 	rs =  (unsigned char) ( (inst >> 21) & 0x1f );

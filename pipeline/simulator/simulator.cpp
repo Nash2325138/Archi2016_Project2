@@ -56,9 +56,10 @@ void stage_fetch(void)
 	IF_ID_buffer.put(inst, control, PC);
 }
 
-void stage_decode(void)
+int stage_decode(void)
 {
 	ID_EX_buffer.inst = IF_ID_buffer.inst;
+	if(IF_ID_buffer.inst == 0xffffffff) return -1;
 	ID_EX_buffer.PC_puls_4 = IF_ID_buffer.PC_puls_4;
 	ID_EX_buffer.control = IF_ID_buffer.control;
 
@@ -72,10 +73,13 @@ void stage_decode(void)
 
 	ID_EX_buffer.rt = IF_ID_buffer.rt;
 	ID_EX_buffer.rd = IF_ID_buffer.rd;
+	return 1;
 }
 
 int stage_execute(void)
 {
+	EX_MEM_buffer.inst = ID_EX_buffer.inst;
+	if(ID_EX_buffer.inst == 0xffffffff) return -1;
 	// EX_MEM_buffer. = ID_EX_buffer.
 	EX_MEM_buffer.control = ID_EX_buffer.control;
 	EX_MEM_buffer.PC_result = ID_EX_buffer.PC_puls_4 + (ID_EX_buffer.extented_immediate << 2);
@@ -412,6 +416,8 @@ int stage_execute(void)
 }
 int stage_memory(void)
 {
+	MEM_WB_buffer.inst = EX_MEM_buffer.inst;
+	if(EX_MEM_buffer.inst == 0xffffffff) return -1;
 	MEM_WB_buffer.control = EX_MEM_buffer.control;
 	int location = EX_MEM_buffer.ALU_result;
 	int rt_data = EX_MEM_buffer.rt_data;
@@ -559,12 +565,12 @@ int stage_memory(void)
 	MEM_WB_buffer.ALU_result = EX_MEM_buffer.ALU_result;
 	MEM_WB_buffer.write_destination = EX_MEM_buffer.write_destination;
 
-	MEM_WB_buffer.inst = EX_MEM_buffer.inst;
 	return 1;
 }
 
 int stage_writeBack(void)
 {
+	if(MEM_WB_buffer.inst == 0xffffffff) return -1;
 	if(MEM_WB_buffer.control->RegWrite)
 	{
 		if(MEM_WB_buffer.write_destination==0){

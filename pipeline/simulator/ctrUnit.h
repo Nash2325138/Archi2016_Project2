@@ -21,6 +21,7 @@ public:
 	CtrUnit(void);
 	void change(unsigned int inst);
 	void print_all(void);
+	void flush(void);
 };
 
 #endif

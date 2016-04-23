@@ -64,6 +64,7 @@ public:
 class MEM_WB_Buffer
 {
 public:
+	unsigned int inst;
 	CtrUnit *control;
 	int ALU_result;
 	int memory_result;

@@ -558,6 +558,25 @@ int stage_memory(void)
 	}
 	MEM_WB_buffer.ALU_result = EX_MEM_buffer.ALU_result;
 	MEM_WB_buffer.write_destination = EX_MEM_buffer.write_destination;
+
+	MEM_WB_buffer.inst = EX_MEM_buffer.inst;
+	return 1;
+}
+
+int stage_writeBack(void)
+{
+	if(MEM_WB_buffer.control->RegWrite)
+	{
+		if(MEM_WB_buffer.write_destination==0){
+			if( (MEM_WB_buffer.inst & 0xf8000000)==0 ) {}		//NOP
+			else {
+				fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
+				return 1;
+			}
+		}
+		int write_data = (MEM_WB_buffer.control->MemtoReg) ?  MEM_WB_buffer.memory_result : MEM_WB_buffer.ALU_result;
+		regs->at(MEM_WB_buffer.write_destination) = write_data;
+	}
 	return 1;
 }
 

@@ -80,6 +80,7 @@ void CtrUnit::change(unsigned int inst)
 				break;
 
 			case 0x08:	//jr
+				RegWrite = false;
 				break;
 
 			default: break;
@@ -211,9 +212,11 @@ void CtrUnit::change(unsigned int inst)
 
 			//--------------------------- J type start -----------------------------//
 			case 0x02:	//j
+				RegWrite = false;
 				break;
 
 			case 0x03:	//jal
+				RegWrite = false;
 				break;
 			//--------------------------- J type end -----------------------------//
 
@@ -245,4 +248,21 @@ void CtrUnit::print_all(void)
 	printf(", RegWrite==%d", (int)RegWrite);
 
 	printf("\n\n");
+}
+
+
+void CtrUnit::flush(void)
+{
+	Jump = false;
+
+	RegDst = false;
+	ALUop[0] = ALUop[1] = false;
+	ALUSrc = false;
+
+	Branch = false;
+	MemRead = false;
+	MemWrite = false;
+	
+	MemtoReg = false;
+	RegWrite = false;
 }

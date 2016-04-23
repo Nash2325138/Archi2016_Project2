@@ -40,7 +40,7 @@ CtrUnit * getEmptyCtrUnit(void)
 	}
 	return NULL;
 }
-void fetch(void)
+void stage_fetch(void)
 {
 	// PCSrc == 1 ?
 	if(EX_MEM_buffer.control->Branch && EX_MEM_buffer.ALU_zero){
@@ -51,7 +51,24 @@ void fetch(void)
 	unsigned int inst = instructions->at(PC/4);
 	CtrUnit *control = getEmptyCtrUnit();
 	PC = PC + 4;
+
+	// in my code, instruction decode to control signal are done in IF stage
 	IF_ID_buffer.put(inst, control, PC);
+}
+
+void stage_decode(void)
+{
+	ID_EX_buffer.inst = IF_ID_buffer.inst;
+	ID_EX_buffer.PC_puls_4 = IF_ID_buffer.PC_puls_4;
+	ID_EX_buffer.control = IF_ID_buffer.control;
+
+	ID_EX_buffer.opcode = IF_ID_buffer.opcode;
+	ID_EX_buffer.funct = IF_ID_buffer.funct;
+	ID_EX_buffer.shamt = IF_ID_buffer.shamt;
+
+	ID_EX_buffer.rs_data = (int) regs->at(IF_ID_buffer.rs);
+	ID_EX_buffer.rt_data = (int) regs->at(IF_ID_buffer.rt);
+	ID_EX_buffer.extented_immediate = (signed)IF_ID_buffer.immediate;
 }
 
 int main(int argc, char const *argv[])

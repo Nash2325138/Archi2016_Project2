@@ -77,6 +77,7 @@ void stage_decode(void)
 int stage_execute(void)
 {
 	// EX_MEM_buffer. = ID_EX_buffer.
+	EX_MEM_buffer.control = ID_EX_buffer.control;
 	EX_MEM_buffer.PC_result = ID_EX_buffer.PC_puls_4 + (ID_EX_buffer.extented_immediate << 2);
 
 	int aluValue1 = ID_EX_buffer.rs_data;
@@ -411,6 +412,7 @@ int stage_execute(void)
 }
 int stage_memory(void)
 {
+	MEM_WB_buffer.control = EX_MEM_buffer.control;
 	int location = EX_MEM_buffer.ALU_result;
 	int rt_data = EX_MEM_buffer.rt_data;
 	int tempValue, toReturn=0;
@@ -470,7 +472,92 @@ int stage_memory(void)
 				break;
 		}
 	}
+	if(EX_MEM_buffer.control->MemRead){
 
+		signed short halfLoaded;
+		signed char byteLoaded;
+		switch(EX_MEM_buffer.opcode)
+		{
+			case 0x23:	//lw
+				if ( location >1020 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 4 != 0 ){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+				MEM_WB_buffer.memory_result = memory->at(location);
+				break;
+
+			case 0x21:	//lh
+				if( location > 1022) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				if(location%4==0) halfLoaded = (signed short) ( (memory->at(location/4)) >> 16);
+				else if(location%2==0) halfLoaded = (signed short) ( (memory->at(location/4)) & 0x0000ffff );
+				MEM_WB_buffer.memory_result = (signed short)halfLoaded;		// <-------- this line is very important!!!
+				break;
+
+			case 0x25:	//lhu 
+				if( location > 1022) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if( location % 2 != 0){
+					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				if(location%4==0) halfLoaded = (unsigned short) ( ((unsigned int)(memory->at(location/4))) >> 16);
+				else if(location%2==0) halfLoaded = (unsigned short) ( (memory->at(location/4)) & 0x0000ffff );
+				MEM_WB_buffer.memory_result = (unsigned short)halfLoaded;
+				break;
+
+			case 0x20:	//lb 
+				if( location > 1023) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				byteLoaded = (signed char) ( ((unsigned int)(memory->at(location/4))) >> (
+																	(location%4==0) ? 24 :
+																	(location%4==1) ? 16 :
+																	(location%4==2) ? 8  :
+																	(location%4==3) ? 0 : 0) ) & 0x000000ff; 
+
+				MEM_WB_buffer.memory_result = (signed char)byteLoaded;
+				break;
+
+			case 0x24:	//lbu
+				if( location > 1023 ) {
+					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
+					toReturn = -1;
+				}
+				if(toReturn!=0) return toReturn;
+
+				byteLoaded = (unsigned char) (((unsigned int)(memory->at(location/4))) >> (
+															(location%4==0) ? 24 :
+															(location%4==1) ? 16 :
+															(location%4==2) ? 8  :
+															(location%4==3) ? 0 : 0) ) & 0x000000ff; 
+
+				MEM_WB_buffer.memory_result = (unsigned char)byteLoaded;
+				break;
+		}
+	}
+	MEM_WB_buffer.ALU_result = EX_MEM_buffer.ALU_result;
+	MEM_WB_buffer.write_destination = EX_MEM_buffer.write_destination;
 	return 1;
 }
 

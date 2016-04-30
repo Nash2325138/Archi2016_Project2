@@ -10,6 +10,10 @@
 #include "./ctrUnit.h"
 #include "./stageBuffer.h"
 
+#define RV_NORMAL 1
+#define RV_HALT 0
+#define RV_CRITICAL_ERROR -1
+
 #define DEBUG_CYCLE 999999
 
 FILE *snapshot;
@@ -33,6 +37,7 @@ void print_snapshot(void);
 int execute(void);
 void destroy_all(void);
 void sumOverflow(int aluValue1, int aluValue2);
+bool needTermination(int *stageReturnValue);
 CtrUnit * getEmptyCtrUnit(void)
 {
 	for(int i=0 ; i<10 ; i++){
@@ -61,7 +66,7 @@ void stage_fetch(void)
 int stage_decode(void)
 {
 	ID_EX_buffer.inst = IF_ID_buffer.inst;
-	if(IF_ID_buffer.inst == 0xffffffff) return -1;
+	if(IF_ID_buffer.inst == 0xffffffff) return RV_HALT;
 	ID_EX_buffer.PC_puls_4 = IF_ID_buffer.PC_puls_4;
 	ID_EX_buffer.control = IF_ID_buffer.control;
 
@@ -75,13 +80,13 @@ int stage_decode(void)
 
 	ID_EX_buffer.rt = IF_ID_buffer.rt;
 	ID_EX_buffer.rd = IF_ID_buffer.rd;
-	return 1;
+	return RV_NORMAL;
 }
 
 int stage_execute(void)
 {
 	EX_MEM_buffer.inst = ID_EX_buffer.inst;
-	if(ID_EX_buffer.inst == 0xffffffff) return -1;
+	if(ID_EX_buffer.inst == 0xffffffff) return RV_HALT;
 	// EX_MEM_buffer. = ID_EX_buffer.
 	EX_MEM_buffer.control = ID_EX_buffer.control;
 	EX_MEM_buffer.PC_result = ID_EX_buffer.PC_puls_4 + (ID_EX_buffer.extented_immediate << 2);
@@ -410,16 +415,16 @@ int stage_execute(void)
 		}
 	}
 	EX_MEM_buffer.ALU_result = alu_result;
-	EX_MEM_buffer.rt_data = ID_EX_buffer.rt_data;
+	EX_MEM_buffer.rt_data = ID_EX_buffer.rt_data;	// needs forwarding if EX/MEM.RegWrite && ( ID/EX.rt==EX/MEM.write_destination )
 	EX_MEM_buffer.opcode = ID_EX_buffer.opcode;
 
 	EX_MEM_buffer.write_destination = (ID_EX_buffer.control->RegDst) ? ID_EX_buffer.rd : ID_EX_buffer.rt;
-	return 1;
+	return RV_NORMAL;
 }
 int stage_memory(void)
 {
 	MEM_WB_buffer.inst = EX_MEM_buffer.inst;
-	if(EX_MEM_buffer.inst == 0xffffffff) return -1;
+	if(EX_MEM_buffer.inst == 0xffffffff) return RV_HALT;
 	MEM_WB_buffer.control = EX_MEM_buffer.control;
 	int location = EX_MEM_buffer.ALU_result;
 	int rt_data = EX_MEM_buffer.rt_data;
@@ -431,11 +436,11 @@ int stage_memory(void)
 			case 0x2B:	//sw
 				if ( location >1020 ) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if( location % 4 != 0 ){
 					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 				memory->at(location/4) = rt_data;
@@ -444,11 +449,11 @@ int stage_memory(void)
 			case 0x29:	//sh
 				if ( location >1022 ) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if( location % 2 != 0 ){
 					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 				
@@ -463,7 +468,7 @@ int stage_memory(void)
 			case 0x28:	//sb
 				if ( location >1023 ) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 				
@@ -489,11 +494,11 @@ int stage_memory(void)
 			case 0x23:	//lw
 				if ( location >1020 ) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if( location % 4 != 0 ){
 					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 				MEM_WB_buffer.memory_result = memory->at(location);
@@ -502,11 +507,11 @@ int stage_memory(void)
 			case 0x21:	//lh
 				if( location > 1022) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if( location % 2 != 0){
 					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 
@@ -518,11 +523,11 @@ int stage_memory(void)
 			case 0x25:	//lhu 
 				if( location > 1022) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if( location % 2 != 0){
 					fprintf(error_dump, "In cycle %d: Misalignment Error\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 
@@ -534,7 +539,7 @@ int stage_memory(void)
 			case 0x20:	//lb 
 				if( location > 1023) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 
@@ -550,7 +555,7 @@ int stage_memory(void)
 			case 0x24:	//lbu
 				if( location > 1023 ) {
 					fprintf(error_dump, "In cycle %d: Address Overflow\n", cycle);
-					toReturn = -1;
+					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
 
@@ -567,25 +572,25 @@ int stage_memory(void)
 	MEM_WB_buffer.ALU_result = EX_MEM_buffer.ALU_result;
 	MEM_WB_buffer.write_destination = EX_MEM_buffer.write_destination;
 
-	return 1;
+	return RV_NORMAL;
 }
 
 int stage_writeBack(void)
 {
-	if(MEM_WB_buffer.inst == 0xffffffff) return -1;
+	if(MEM_WB_buffer.inst == 0xffffffff) return RV_HALT;
 	if(MEM_WB_buffer.control->RegWrite)
 	{
 		if(MEM_WB_buffer.write_destination==0){
 			if( (MEM_WB_buffer.inst & 0xf8000000)==0 ) {}		//NOP
 			else {
 				fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
-				return 1;
+				return RV_NORMAL;
 			}
 		}
 		int write_data = (MEM_WB_buffer.control->MemtoReg) ?  MEM_WB_buffer.memory_result : MEM_WB_buffer.ALU_result;
 		regs->at(MEM_WB_buffer.write_destination) = write_data;
 	}
-	return 1;
+	return RV_NORMAL;
 }
 
 int main(int argc, char const *argv[])
@@ -611,15 +616,37 @@ int main(int argc, char const *argv[])
 		exit(666);
 	}
 
-
-	do{
+	int stageReturnValue[4];
+	/*do{
 		print_snapshot();
 		cycle++;
-	}while (execute() != -1 && cycle < 510000);
+	}while (execute() != -1 && cycle < 510000);*/
+	while(true)
+	{
+		print_snapshot();
+		cycle++;
+		stageReturnValue[0] = stage_writeBack();
+		stageReturnValue[1] = stage_memory();
+		stageReturnValue[2] = stage_execute();
+		stageReturnValue[3] = stage_decode();
+		if( needTermination(stageReturnValue) || cycle > 600000) break;
+	}
 	
 
 	destroy_all();
 	return 0;
+}
+
+bool needTermination(int *stageReturnValue)
+{
+	for(int i=0 ; i<4 ; i++)
+		if(stageReturnValue[i]==RV_CRITICAL_ERROR) return true;
+
+	bool flag = true;
+	for(int i=0 ; i<4 ; i++){
+		if(stageReturnValue[i]==RV_NORMAL) flag = false;
+	}
+	return flag;
 }
 
 void readInput_initialize(void)

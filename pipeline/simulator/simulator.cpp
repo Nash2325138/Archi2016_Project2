@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 
+#include <string.h>
+
 #include "./instruction.h"
 #include "./regfile.h"
 #include "./memory.h"
@@ -16,6 +18,7 @@
 
 #define DEBUG_CYCLE 999999
 
+
 FILE *snapshot;
 FILE *error_dump;
 
@@ -24,12 +27,19 @@ InstructionMemery* instructions;
 Registers* regs;
 unsigned int PC;
 int cycle;
-CtrUnit * (ctrUnit)[10];
+CtrUnit * (ctrUnit)[30];
 
-IF_ID_Buffer IF_ID_buffer;
-ID_EX_Buffer ID_EX_buffer;
-EX_MEM_Buffer EX_MEM_buffer;
-MEM_WB_Buffer MEM_WB_buffer;
+IF_ID_Buffer IF_ID_buffer_back;
+IF_ID_Buffer IF_ID_buffer_front;
+
+ID_EX_Buffer ID_EX_buffer_back;
+ID_EX_Buffer ID_EX_buffer_front;
+
+EX_MEM_Buffer EX_MEM_buffer_back;
+EX_MEM_Buffer EX_MEM_buffer_front;
+
+MEM_WB_Buffer MEM_WB_buffer_back;
+MEM_WB_Buffer MEM_WB_buffer_front;
 
 std::vector<unsigned int>* readImage(FILE *);
 void readInput_initialize(void);
@@ -40,16 +50,18 @@ void sumOverflow(int aluValue1, int aluValue2);
 bool needTermination(int *stageReturnValue);
 CtrUnit * getEmptyCtrUnit(void)
 {
-	for(int i=0 ; i<10 ; i++){
+	for(int i=0 ; i<30 ; i++){
 		if(ctrUnit[i]->used == false) return ctrUnit[i];
 	}
 	return NULL;
 }
+
+
 void stage_fetch(void)
 {
 	// PCSrc == 1 ?
-	if(EX_MEM_buffer.control->Branch && EX_MEM_buffer.ALU_zero){
-		PC = EX_MEM_buffer.PC_result;
+	if(EX_MEM_buffer_front.control->Branch && EX_MEM_buffer_front.ALU_zero){
+		PC = EX_MEM_buffer_front.PC_result;
 	} else {
 		// PC value remains
 	}
@@ -60,43 +72,43 @@ void stage_fetch(void)
 
 	// in my code, instruction decode to control signal are done in IF stage
 	control->change(inst);
-	IF_ID_buffer.put(inst, control, PC);
+	IF_ID_buffer_back.put(inst, control, PC);
 }
 
 int stage_decode(void)
 {
-	ID_EX_buffer.inst = IF_ID_buffer.inst;
-	if(IF_ID_buffer.inst == 0xffffffff) return RV_HALT;
-	ID_EX_buffer.PC_puls_4 = IF_ID_buffer.PC_puls_4;
-	ID_EX_buffer.control = IF_ID_buffer.control;
+	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
+	if(IF_ID_buffer_front.inst == 0xffffffff) return RV_HALT;
+	ID_EX_buffer_back.PC_puls_4 = IF_ID_buffer_front.PC_puls_4;
+	ID_EX_buffer_back.control = IF_ID_buffer_front.control;
 
-	ID_EX_buffer.opcode = IF_ID_buffer.opcode;
-	ID_EX_buffer.funct = IF_ID_buffer.funct;
-	ID_EX_buffer.shamt = IF_ID_buffer.shamt;
+	ID_EX_buffer_back.opcode = IF_ID_buffer_front.opcode;
+	ID_EX_buffer_back.funct = IF_ID_buffer_front.funct;
+	ID_EX_buffer_back.shamt = IF_ID_buffer_front.shamt;
 
-	ID_EX_buffer.rs_data = (int) regs->at(IF_ID_buffer.rs);
-	ID_EX_buffer.rt_data = (int) regs->at(IF_ID_buffer.rt);
-	ID_EX_buffer.extented_immediate = (signed)IF_ID_buffer.immediate;
+	ID_EX_buffer_back.rs_data = (int) regs->at(IF_ID_buffer_front.rs);
+	ID_EX_buffer_back.rt_data = (int) regs->at(IF_ID_buffer_front.rt);
+	ID_EX_buffer_back.extented_immediate = (signed)IF_ID_buffer_front.immediate;
 
-	ID_EX_buffer.rt = IF_ID_buffer.rt;
-	ID_EX_buffer.rd = IF_ID_buffer.rd;
+	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
+	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
 	return RV_NORMAL;
 }
 
 int stage_execute(void)
 {
-	EX_MEM_buffer.inst = ID_EX_buffer.inst;
-	if(ID_EX_buffer.inst == 0xffffffff) return RV_HALT;
-	// EX_MEM_buffer. = ID_EX_buffer.
-	EX_MEM_buffer.control = ID_EX_buffer.control;
-	EX_MEM_buffer.PC_result = ID_EX_buffer.PC_puls_4 + (ID_EX_buffer.extented_immediate << 2);
+	EX_MEM_buffer_back.inst = ID_EX_buffer_front.inst;
+	if(ID_EX_buffer_front.inst == 0xffffffff) return RV_HALT;
+	// EX_MEM_buffer_back. = ID_EX_buffer_front.
+	EX_MEM_buffer_back.control = ID_EX_buffer_front.control;
+	EX_MEM_buffer_back.PC_result = ID_EX_buffer_front.PC_puls_4 + (ID_EX_buffer_front.extented_immediate << 2);
 
-	int aluValue1 = ID_EX_buffer.rs_data;
-	int aluValue2 = (ID_EX_buffer.control->ALUSrc) ? ID_EX_buffer.extented_immediate : ID_EX_buffer.rt_data;
+	int aluValue1 = ID_EX_buffer_front.rs_data;
+	int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
 	int alu_result;
 
-	if(ID_EX_buffer.opcode == 0x00){
-		switch(ID_EX_buffer.funct)
+	if(ID_EX_buffer_front.opcode == 0x00){
+		switch(ID_EX_buffer_front.funct)
 		{
 			case 0x20:	// add
 				sumOverflow(aluValue1, aluValue2);
@@ -138,15 +150,15 @@ int stage_execute(void)
 				break;
 
 			case 0x00:	//sll
-				alu_result = aluValue1 << ID_EX_buffer.shamt;
+				alu_result = aluValue1 << ID_EX_buffer_front.shamt;
 				break;
 
 			case 0x02:	//srl
-				alu_result = ((unsigned int)aluValue1) >> ID_EX_buffer.shamt;
+				alu_result = ((unsigned int)aluValue1) >> ID_EX_buffer_front.shamt;
 				break;
 
 			case 0x03:	//sra
-				alu_result = ((int)aluValue1) >> ID_EX_buffer.shamt;
+				alu_result = ((int)aluValue1) >> ID_EX_buffer_front.shamt;
 				break;
 
 			case 0x08:	//jr
@@ -158,7 +170,7 @@ int stage_execute(void)
 		//int aluValue1 = (int)regs->at(rs);
 		//int aluValue2 = (signed short)immediate;
 		//unsigned int location = (regs->at(rs) + ((signed short)immediate) );
-		switch(ID_EX_buffer.opcode)
+		switch(ID_EX_buffer_front.opcode)
 		{
 			//--------------------------- I type start -----------------------------//
 			case 0x08: 	// addi
@@ -233,15 +245,15 @@ int stage_execute(void)
 
 			// ---------- in project 2, branch and jump should be done at ID stage !!!! ---------- //
 			case 0x04:	//beq
-				EX_MEM_buffer.ALU_zero = ( aluValue1==aluValue2 ) ? true : false;
+				EX_MEM_buffer_back.ALU_zero = ( aluValue1==aluValue2 ) ? true : false;
 				break;
 
 			case 0x05:	//bne 
-				EX_MEM_buffer.ALU_zero = ( aluValue1!=aluValue2 ) ? true : false;
+				EX_MEM_buffer_back.ALU_zero = ( aluValue1!=aluValue2 ) ? true : false;
 				break;
 			
 			case 0x07:	//bgtz 
-				EX_MEM_buffer.ALU_zero = ( aluValue1 > 0 ) ? true : false;
+				EX_MEM_buffer_back.ALU_zero = ( aluValue1 > 0 ) ? true : false;
 				break;
 			//--------------------------- I type end -----------------------------//
 
@@ -271,24 +283,24 @@ int stage_execute(void)
 				break;
 		}
 	}
-	EX_MEM_buffer.ALU_result = alu_result;
-	EX_MEM_buffer.rt_data = ID_EX_buffer.rt_data;	// needs forwarding if EX/MEM.RegWrite && ( ID/EX.rt==EX/MEM.write_destination )
-	EX_MEM_buffer.opcode = ID_EX_buffer.opcode;
+	EX_MEM_buffer_back.ALU_result = alu_result;
+	EX_MEM_buffer_back.rt_data = ID_EX_buffer_front.rt_data;	// needs forwarding if EX/MEM.RegWrite && ( ID/EX.rt==EX/MEM.write_destination )
+	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
 
-	EX_MEM_buffer.write_destination = (ID_EX_buffer.control->RegDst) ? ID_EX_buffer.rd : ID_EX_buffer.rt;
+	EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
 	return RV_NORMAL;
 }
 int stage_memory(void)
 {
-	MEM_WB_buffer.inst = EX_MEM_buffer.inst;
-	if(EX_MEM_buffer.inst == 0xffffffff) return RV_HALT;
-	MEM_WB_buffer.control = EX_MEM_buffer.control;
-	int location = EX_MEM_buffer.ALU_result;
-	int rt_data = EX_MEM_buffer.rt_data;
+	MEM_WB_buffer_back.inst = EX_MEM_buffer_front.inst;
+	if(EX_MEM_buffer_front.inst == 0xffffffff) return RV_HALT;
+	MEM_WB_buffer_back.control = EX_MEM_buffer_front.control;
+	int location = EX_MEM_buffer_front.ALU_result;
+	int rt_data = EX_MEM_buffer_front.rt_data;
 	int tempValue, toReturn=0;
-	if(EX_MEM_buffer.control->MemWrite){
-		//memory->at(EX_MEM_buffer.ALU_result)
-		switch(EX_MEM_buffer.opcode)
+	if(EX_MEM_buffer_front.control->MemWrite){
+		//memory->at(EX_MEM_buffer_front.ALU_result)
+		switch(EX_MEM_buffer_front.opcode)
 		{
 			case 0x2B:	//sw
 				if ( location >1020 ) {
@@ -342,11 +354,11 @@ int stage_memory(void)
 				break;
 		}
 	}
-	if(EX_MEM_buffer.control->MemRead){
+	if(EX_MEM_buffer_front.control->MemRead){
 
 		signed short halfLoaded;
 		signed char byteLoaded;
-		switch(EX_MEM_buffer.opcode)
+		switch(EX_MEM_buffer_front.opcode)
 		{
 			case 0x23:	//lw
 				if ( location >1020 ) {
@@ -358,7 +370,7 @@ int stage_memory(void)
 					toReturn = RV_CRITICAL_ERROR;
 				}
 				if(toReturn!=0) return toReturn;
-				MEM_WB_buffer.memory_result = memory->at(location);
+				MEM_WB_buffer_back.memory_result = memory->at(location);
 				break;
 
 			case 0x21:	//lh
@@ -374,7 +386,7 @@ int stage_memory(void)
 
 				if(location%4==0) halfLoaded = (signed short) ( (memory->at(location/4)) >> 16);
 				else if(location%2==0) halfLoaded = (signed short) ( (memory->at(location/4)) & 0x0000ffff );
-				MEM_WB_buffer.memory_result = (signed short)halfLoaded;		// <-------- this line is very important!!!
+				MEM_WB_buffer_back.memory_result = (signed short)halfLoaded;		// <-------- this line is very important!!!
 				break;
 
 			case 0x25:	//lhu 
@@ -390,7 +402,7 @@ int stage_memory(void)
 
 				if(location%4==0) halfLoaded = (unsigned short) ( ((unsigned int)(memory->at(location/4))) >> 16);
 				else if(location%2==0) halfLoaded = (unsigned short) ( (memory->at(location/4)) & 0x0000ffff );
-				MEM_WB_buffer.memory_result = (unsigned short)halfLoaded;
+				MEM_WB_buffer_back.memory_result = (unsigned short)halfLoaded;
 				break;
 
 			case 0x20:	//lb 
@@ -406,7 +418,7 @@ int stage_memory(void)
 																	(location%4==2) ? 8  :
 																	(location%4==3) ? 0 : 0) ) & 0x000000ff; 
 
-				MEM_WB_buffer.memory_result = (signed char)byteLoaded;
+				MEM_WB_buffer_back.memory_result = (signed char)byteLoaded;
 				break;
 
 			case 0x24:	//lbu
@@ -422,32 +434,42 @@ int stage_memory(void)
 															(location%4==2) ? 8  :
 															(location%4==3) ? 0 : 0) ) & 0x000000ff; 
 
-				MEM_WB_buffer.memory_result = (unsigned char)byteLoaded;
+				MEM_WB_buffer_back.memory_result = (unsigned char)byteLoaded;
 				break;
 		}
 	}
-	MEM_WB_buffer.ALU_result = EX_MEM_buffer.ALU_result;
-	MEM_WB_buffer.write_destination = EX_MEM_buffer.write_destination;
+	MEM_WB_buffer_back.ALU_result = EX_MEM_buffer_front.ALU_result;
+	MEM_WB_buffer_back.write_destination = EX_MEM_buffer_front.write_destination;
 
 	return RV_NORMAL;
 }
 
 int stage_writeBack(void)
 {
-	if(MEM_WB_buffer.inst == 0xffffffff) return RV_HALT;
-	if(MEM_WB_buffer.control->RegWrite)
+	if(MEM_WB_buffer_front.inst == 0xffffffff) return RV_HALT;
+	if(MEM_WB_buffer_front.control->RegWrite)
 	{
-		if(MEM_WB_buffer.write_destination==0){
-			if( (MEM_WB_buffer.inst & 0xf8000000)==0 ) {}		//NOP
+		if(MEM_WB_buffer_front.write_destination==0){
+			if( (MEM_WB_buffer_front.inst & 0xf8000000)==0 ) {}		//NOP
 			else {
 				fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
 				return RV_NORMAL;
 			}
 		}
-		int write_data = (MEM_WB_buffer.control->MemtoReg) ?  MEM_WB_buffer.memory_result : MEM_WB_buffer.ALU_result;
-		regs->at(MEM_WB_buffer.write_destination) = write_data;
+		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
+		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
 	}
 	return RV_NORMAL;
+}
+
+void trigger(void)
+{
+	MEM_WB_buffer_front.control->used = false;
+
+	MEM_WB_buffer_front = MEM_WB_buffer_back;
+	EX_MEM_buffer_front = EX_MEM_buffer_back;
+	ID_EX_buffer_front = ID_EX_buffer_back;
+	IF_ID_buffer_front = IF_ID_buffer_back;
 }
 
 int main(int argc, char const *argv[])
@@ -465,12 +487,12 @@ int main(int argc, char const *argv[])
 	snapshot = fopen("snapshot.rpt", "w");
 	if(snapshot==NULL){
 		fputs("snapshot write error", stderr);
-		exit(666);
+		exit(EXIT_FAILURE);
 	}
 	error_dump = fopen("error_dump.rpt", "w");
 	if(error_dump==NULL){
 		fputs("error_dump write error", stderr);
-		exit(666);
+		exit(EXIT_FAILURE);
 	}
 
 	int stageReturnValue[4];
@@ -486,6 +508,8 @@ int main(int argc, char const *argv[])
 		stageReturnValue[1] = stage_memory();
 		stageReturnValue[2] = stage_execute();
 		stageReturnValue[3] = stage_decode();
+		trigger();
+		fprintf(snapshot, "\n\n");
 		if( needTermination(stageReturnValue) || cycle > 600000) break;
 	}
 	
@@ -541,7 +565,7 @@ void readInput_initialize(void)
 	regs = new Registers(sp);
 	//for(unsigned int i=0 ; i<regs->size() ; i++)	printf("%d: %x\n", i, regs->at(i));
 	//printf("\n");
-	for(int i=0 ; i<10 ; i++){
+	for(int i=0 ; i<30 ; i++){
 		ctrUnit[i] = new CtrUnit();
 	}
 }
@@ -554,7 +578,6 @@ void print_snapshot(void)
 		fprintf(snapshot, "$%02d: 0x%08X\n", i, (unsigned int)regs->at(i));
 	}
 	fprintf(snapshot, "PC: 0x%08X\n", PC);
-	fprintf(snapshot, "\n\n");
 }
 
 
@@ -565,7 +588,7 @@ void destroy_all(void)
 	delete memory;
 	delete instructions;
 	delete regs;
-	for(int i=0 ; i<10 ; i++) delete ctrUnit[i];
+	for(int i=0 ; i<30 ; i++) delete ctrUnit[i];
 
 	fclose(snapshot);
 	fclose(error_dump);

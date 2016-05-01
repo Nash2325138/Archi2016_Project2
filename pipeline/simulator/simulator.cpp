@@ -19,6 +19,7 @@
 #define DEBUG_CYCLE 999999
 
 char UpperStringInst[30];
+char snapshotWriterBuffer[5][100];
 
 FILE *snapshot;
 FILE *error_dump;
@@ -226,7 +227,7 @@ void stage_fetch(void)
 		// PC value remains
 	}
 	unsigned int inst = instructions->at(PC/4);
-	fprintf(snapshot, "IF: 0x%08X", inst);
+	sprintf(snapshotWriterBuffer[0], "IF: 0x%08X", inst);
 
 	CtrUnit *control;
 	if( (control = getEmptyCtrUnit())==NULL) fprintf(stderr, "No empty CtrUnit\n");
@@ -235,18 +236,15 @@ void stage_fetch(void)
 	// in my code, instruction decode to control signal are done in IF stage
 	control->change(inst);
 	IF_ID_buffer_back.put(inst, control, PC);
-	
-	fprintf(snapshot, "\n");	
 }
 
 int stage_decode(void)
 {
 	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
 	inst_UpperString(IF_ID_buffer_front.inst);
-	fprintf(snapshot, "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[1], "%s", UpperStringInst);
 	if(IF_ID_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
-		fprintf(snapshot, "\n");
 	}
 
 	ID_EX_buffer_back.PC_puls_4 = IF_ID_buffer_front.PC_puls_4;
@@ -262,7 +260,6 @@ int stage_decode(void)
 
 	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
 	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
-	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 
@@ -270,9 +267,8 @@ int stage_execute(void)
 {
 	EX_MEM_buffer_back.inst = ID_EX_buffer_front.inst;
 	inst_UpperString(ID_EX_buffer_front.inst);
-	fprintf(snapshot, "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[2], "%s", UpperStringInst);
 	if(ID_EX_buffer_front.inst == 0xffffffff) {
-		fprintf(snapshot, "\n");
 		return RV_HALT;
 	}
 
@@ -465,16 +461,14 @@ int stage_execute(void)
 	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
 
 	EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
-	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 int stage_memory(void)
 {
 	MEM_WB_buffer_back.inst = EX_MEM_buffer_front.inst;
 	inst_UpperString(EX_MEM_buffer_front.inst);
-	fprintf(snapshot, "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[3], "%s", UpperStringInst);
 	if(EX_MEM_buffer_front.inst == 0xffffffff) {
-		fprintf(snapshot, "\n");
 		return RV_HALT;
 	}
 	MEM_WB_buffer_back.control = EX_MEM_buffer_front.control;
@@ -624,16 +618,14 @@ int stage_memory(void)
 	MEM_WB_buffer_back.ALU_result = EX_MEM_buffer_front.ALU_result;
 	MEM_WB_buffer_back.write_destination = EX_MEM_buffer_front.write_destination;
 
-	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 
 int stage_writeBack(void)
 {
 	inst_UpperString(MEM_WB_buffer_front.inst);
-	fprintf(snapshot, "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[4], "%s", UpperStringInst);
 	if(MEM_WB_buffer_front.inst == 0xffffffff){
-		fprintf(snapshot, "\n");
 		return RV_HALT;
 	}
 	if(MEM_WB_buffer_front.control->RegWrite)
@@ -648,7 +640,6 @@ int stage_writeBack(void)
 		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
 		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
 	}
-	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 
@@ -699,6 +690,9 @@ int main(int argc, char const *argv[])
 		stageReturnValue[2] = stage_execute();
 		stageReturnValue[3] = stage_decode();
 		trigger();
+		for(int i=0 ; i<5 ; i++){
+			fprintf(snapshot, "%s\n", snapshotWriterBuffer[i]);
+		}
 		fprintf(snapshot, "\n\n");
 		if( needTermination(stageReturnValue) || cycle > 600000) break;
 	}

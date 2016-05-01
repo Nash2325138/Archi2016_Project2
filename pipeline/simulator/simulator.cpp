@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+// #include <iostream>
 #include <vector>
 #include <string>
 
@@ -62,6 +62,10 @@ void inst_UpperString(unsigned int inst)
 {
 	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
 	unsigned char funct = (unsigned char) (inst & 0x3f);
+	unsigned char rt = (unsigned char) ( (inst >> 16) & 0x1f );
+	unsigned char shamt = (unsigned char) ( (inst >> 6) & 0x1f );
+	unsigned char rd = (unsigned char) ( (inst >> 11) & 0x1f );
+				
 	if(opcode == 0x00){
 		switch(funct)
 		{
@@ -102,7 +106,8 @@ void inst_UpperString(unsigned int inst)
 				break;
 
 			case 0x00:	//sll
-				strcpy(UpperStringInst, "SLL");
+				if( rt==0 && rd==0 && shamt==0 ) strcpy(UpperStringInst, "NOP"); 
+				else strcpy(UpperStringInst, "SLL");
 				break;
 
 			case 0x02:	//srl
@@ -242,7 +247,7 @@ int stage_decode(void)
 {
 	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
 	inst_UpperString(IF_ID_buffer_front.inst);
-	sprintf(snapshotWriterBuffer[1], "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[1], "ID: %s", UpperStringInst);
 	if(IF_ID_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
@@ -267,7 +272,7 @@ int stage_execute(void)
 {
 	EX_MEM_buffer_back.inst = ID_EX_buffer_front.inst;
 	inst_UpperString(ID_EX_buffer_front.inst);
-	sprintf(snapshotWriterBuffer[2], "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[2], "EX: %s", UpperStringInst);
 	if(ID_EX_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
@@ -467,7 +472,7 @@ int stage_memory(void)
 {
 	MEM_WB_buffer_back.inst = EX_MEM_buffer_front.inst;
 	inst_UpperString(EX_MEM_buffer_front.inst);
-	sprintf(snapshotWriterBuffer[3], "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[3], "DM: %s", UpperStringInst);
 	if(EX_MEM_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
@@ -624,7 +629,7 @@ int stage_memory(void)
 int stage_writeBack(void)
 {
 	inst_UpperString(MEM_WB_buffer_front.inst);
-	sprintf(snapshotWriterBuffer[4], "%s", UpperStringInst);
+	sprintf(snapshotWriterBuffer[4], "WB: %s", UpperStringInst);
 	if(MEM_WB_buffer_front.inst == 0xffffffff){
 		return RV_HALT;
 	}
@@ -659,7 +664,7 @@ int main(int argc, char const *argv[])
 	instruction();
 	regfile();
 	memory();*/
-	readInput_initialize();
+
 	//for(int i=0 ; i<instructions->size() ; i++)printf("%x ", instructions->at(i));
 	//for(int i=0 ; i<regs->size() ; i++) printf("%x ", regs->at(i));
 	//printf("\n") ;
@@ -675,6 +680,13 @@ int main(int argc, char const *argv[])
 		fputs("error_dump write error", stderr);
 		exit(EXIT_FAILURE);
 	}
+	printf("!");
+	fflush(stdout);
+
+	readInput_initialize();
+	
+	printf("!");
+	fflush(stdout);
 
 	int stageReturnValue[4];
 	/*do{
@@ -684,17 +696,35 @@ int main(int argc, char const *argv[])
 	while(true)
 	{
 		print_snapshot();
+
 		cycle++;
 		stageReturnValue[0] = stage_writeBack();
+		//printf("%s\n", snapshotWriterBuffer[4]);
+
 		stageReturnValue[1] = stage_memory();
+		//printf("%s\n", snapshotWriterBuffer[3]);
+
 		stageReturnValue[2] = stage_execute();
+		//printf("%s\n", snapshotWriterBuffer[2]);
+
 		stageReturnValue[3] = stage_decode();
+		//printf("%s\n", snapshotWriterBuffer[1]);
+
+		stage_fetch();
+		//printf("%s\n", snapshotWriterBuffer[0]);
+
+
 		trigger();
+		printf("\ncycle %d: ", cycle);
 		for(int i=0 ; i<5 ; i++){
 			fprintf(snapshot, "%s\n", snapshotWriterBuffer[i]);
+			printf("%s\n", snapshotWriterBuffer[i]);
 		}
+
 		fprintf(snapshot, "\n\n");
 		if( needTermination(stageReturnValue) || cycle > 600000) break;
+
+		fflush(stdout);
 	}
 	
 
@@ -752,6 +782,10 @@ void readInput_initialize(void)
 	for(int i=0 ; i<30 ; i++){
 		ctrUnit[i] = new CtrUnit();
 	}
+	IF_ID_buffer_front.control = getEmptyCtrUnit();
+	ID_EX_buffer_front.control = getEmptyCtrUnit();
+	EX_MEM_buffer_front.control = getEmptyCtrUnit();
+	MEM_WB_buffer_front.control = getEmptyCtrUnit();
 }
 
 

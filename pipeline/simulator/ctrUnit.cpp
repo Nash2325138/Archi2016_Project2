@@ -1,5 +1,7 @@
 #include "ctrUnit.h"
 /*
+	bool used;
+
 	bool Jump;
 
 	bool RegDst;
@@ -15,7 +17,7 @@
 */
 CtrUnit::CtrUnit(void)
 {
-	used = false;
+	used = Jump = RegDst = ALUop[0] = ALUop[1] = ALUSrc = Branch = MemRead = MemWrite = MemtoReg = RegWrite = false;
 }
 
 void CtrUnit::change(unsigned int inst)

@@ -18,6 +18,7 @@
 
 #define DEBUG_CYCLE 999999
 
+char UpperStringInst[30];
 
 FILE *snapshot;
 FILE *error_dump;
@@ -56,6 +57,165 @@ CtrUnit * getEmptyCtrUnit(void)
 	return NULL;
 }
 
+void inst_UpperString(unsigned int inst)
+{
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	unsigned char funct = (unsigned char) (inst & 0x3f);
+	if(opcode == 0x00){
+		switch(funct)
+		{
+			case 0x20:	// add
+				strcpy(UpperStringInst, "ADD");
+				break;
+
+			case 0x21:	// addu
+				strcpy(UpperStringInst, "ADDU");
+				break;
+
+			case 0x22:	// sub
+				strcpy(UpperStringInst, "SUB");
+				break;
+
+			case 0x24:	// and
+				strcpy(UpperStringInst, "AND");
+				break;
+
+			case 0x25:	// or
+				strcpy(UpperStringInst, "OR");
+				break;
+
+			case 0x26:	//xor
+				strcpy(UpperStringInst, "XOR");
+				break;
+
+			case 0x27:	//nor
+				strcpy(UpperStringInst, "NOR");
+				break;
+
+			case 0x28:	//nand
+				strcpy(UpperStringInst, "NAND");
+				break;
+
+			case 0x2a:	//slt
+				strcpy(UpperStringInst, "SLT");
+				break;
+
+			case 0x00:	//sll
+				strcpy(UpperStringInst, "SLL");
+				break;
+
+			case 0x02:	//srl
+				strcpy(UpperStringInst, "SRL");
+				break;
+
+			case 0x03:	//sra
+				strcpy(UpperStringInst, "SRA");
+				break;
+
+			case 0x08:	//jr
+				strcpy(UpperStringInst, "JR");
+				break;
+
+			default: break;
+		}
+	} else {
+		switch(opcode)
+		{
+			case 0x08: 	// addi
+				strcpy(UpperStringInst, "ADDI");
+				break;
+
+			case 0x09:	// addiu
+				strcpy(UpperStringInst, "ADDIU");
+				break;
+
+			case 0x23:	//lw
+				strcpy(UpperStringInst, "LW");
+				break;
+
+			case 0x21:	//lh
+				strcpy(UpperStringInst, "LH");
+				break;
+
+			case 0x25:	//lhu 
+				strcpy(UpperStringInst, "LHU");
+				break;
+
+			case 0x20:	//lb 
+				strcpy(UpperStringInst, "LB");
+				break;
+
+			case 0x24:	//lbu
+				strcpy(UpperStringInst, "LBU");
+				break;
+
+			case 0x2B:	//sw
+				strcpy(UpperStringInst, "SW");
+				break;
+
+			case 0x29:	//sh
+				strcpy(UpperStringInst, "SH");
+				break;
+
+			case 0x28:	//sb
+				strcpy(UpperStringInst, "SB");
+				break;
+
+			case 0x0F:	//lui 
+				strcpy(UpperStringInst, "LUI");
+				break;
+
+			case 0x0C:	//andi 
+				strcpy(UpperStringInst, "ANDI");
+				break;
+
+			case 0x0D:	//ori 
+				strcpy(UpperStringInst, "ORI");
+				break;
+
+			case 0x0E:	//nori 
+				strcpy(UpperStringInst, "NORI");
+				break;
+			
+			case 0x0A:	//slti
+				strcpy(UpperStringInst, "SLTI");
+				break;
+
+			case 0x04:	//beq
+				strcpy(UpperStringInst, "BEQ");
+				break;
+
+			case 0x05:	//bne 
+				strcpy(UpperStringInst, "BNE");
+				break;
+			
+			case 0x07:	//bgtz 
+				strcpy(UpperStringInst, "BGTZ");
+				break;
+			//--------------------------- I type end -----------------------------//
+
+
+			//--------------------------- J type start -----------------------------//
+			case 0x02:	//j
+				strcpy(UpperStringInst, "J");
+				break;
+
+			case 0x03:	//jal
+				strcpy(UpperStringInst, "JAL");
+				break;
+			//--------------------------- J type end -----------------------------//
+
+
+			
+			case 0x3f:	// halt
+				strcpy(UpperStringInst, "HALT");
+				break;
+			default:
+				fputs("no such instruction", stderr);
+				break;
+		}
+	}
+}
 
 void stage_fetch(void)
 {
@@ -66,6 +226,8 @@ void stage_fetch(void)
 		// PC value remains
 	}
 	unsigned int inst = instructions->at(PC/4);
+	fprintf(snapshot, "IF: 0x%08X", inst);
+
 	CtrUnit *control;
 	if( (control = getEmptyCtrUnit())==NULL) fprintf(stderr, "No empty CtrUnit\n");
 	PC = PC + 4;
@@ -73,12 +235,20 @@ void stage_fetch(void)
 	// in my code, instruction decode to control signal are done in IF stage
 	control->change(inst);
 	IF_ID_buffer_back.put(inst, control, PC);
+	
+	fprintf(snapshot, "\n");	
 }
 
 int stage_decode(void)
 {
 	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
-	if(IF_ID_buffer_front.inst == 0xffffffff) return RV_HALT;
+	inst_UpperString(IF_ID_buffer_front.inst);
+	fprintf(snapshot, "%s", UpperStringInst);
+	if(IF_ID_buffer_front.inst == 0xffffffff) {
+		return RV_HALT;
+		fprintf(snapshot, "\n");
+	}
+
 	ID_EX_buffer_back.PC_puls_4 = IF_ID_buffer_front.PC_puls_4;
 	ID_EX_buffer_back.control = IF_ID_buffer_front.control;
 
@@ -92,13 +262,20 @@ int stage_decode(void)
 
 	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
 	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
+	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 
 int stage_execute(void)
 {
 	EX_MEM_buffer_back.inst = ID_EX_buffer_front.inst;
-	if(ID_EX_buffer_front.inst == 0xffffffff) return RV_HALT;
+	inst_UpperString(ID_EX_buffer_front.inst);
+	fprintf(snapshot, "%s", UpperStringInst);
+	if(ID_EX_buffer_front.inst == 0xffffffff) {
+		fprintf(snapshot, "\n");
+		return RV_HALT;
+	}
+
 	// EX_MEM_buffer_back. = ID_EX_buffer_front.
 	EX_MEM_buffer_back.control = ID_EX_buffer_front.control;
 	EX_MEM_buffer_back.PC_result = ID_EX_buffer_front.PC_puls_4 + (ID_EX_buffer_front.extented_immediate << 2);
@@ -288,12 +465,18 @@ int stage_execute(void)
 	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
 
 	EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
+	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 int stage_memory(void)
 {
 	MEM_WB_buffer_back.inst = EX_MEM_buffer_front.inst;
-	if(EX_MEM_buffer_front.inst == 0xffffffff) return RV_HALT;
+	inst_UpperString(EX_MEM_buffer_front.inst);
+	fprintf(snapshot, "%s", UpperStringInst);
+	if(EX_MEM_buffer_front.inst == 0xffffffff) {
+		fprintf(snapshot, "\n");
+		return RV_HALT;
+	}
 	MEM_WB_buffer_back.control = EX_MEM_buffer_front.control;
 	int location = EX_MEM_buffer_front.ALU_result;
 	int rt_data = EX_MEM_buffer_front.rt_data;
@@ -441,12 +624,18 @@ int stage_memory(void)
 	MEM_WB_buffer_back.ALU_result = EX_MEM_buffer_front.ALU_result;
 	MEM_WB_buffer_back.write_destination = EX_MEM_buffer_front.write_destination;
 
+	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 
 int stage_writeBack(void)
 {
-	if(MEM_WB_buffer_front.inst == 0xffffffff) return RV_HALT;
+	inst_UpperString(MEM_WB_buffer_front.inst);
+	fprintf(snapshot, "%s", UpperStringInst);
+	if(MEM_WB_buffer_front.inst == 0xffffffff){
+		fprintf(snapshot, "\n");
+		return RV_HALT;
+	}
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
 		if(MEM_WB_buffer_front.write_destination==0){
@@ -459,6 +648,7 @@ int stage_writeBack(void)
 		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
 		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
 	}
+	fprintf(snapshot, "\n");
 	return RV_NORMAL;
 }
 

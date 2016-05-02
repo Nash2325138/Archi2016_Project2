@@ -342,7 +342,7 @@ int stage_decode(void)
 		if(willBranch(IF_ID_buffer_front.inst, ID_EX_buffer_back.rs_data, ID_EX_buffer_back.rt_data))
 		{
 			IF_Flush = true;
-			branch_jump_PC = PC + 4 + (4*ID_EX_buffer_back.extented_immediate);
+			branch_jump_PC = ID_EX_buffer_back.PC_puls_4 + (4*ID_EX_buffer_back.extented_immediate);
 		}
 	}
 

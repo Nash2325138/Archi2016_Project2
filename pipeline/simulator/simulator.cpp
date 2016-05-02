@@ -43,6 +43,9 @@ EX_MEM_Buffer EX_MEM_buffer_front;
 MEM_WB_Buffer MEM_WB_buffer_back;
 MEM_WB_Buffer MEM_WB_buffer_front;
 
+bool IF_Flush;
+unsigned int branch_jump_PC;
+
 std::vector<unsigned int>* readImage(FILE *);
 void readInput_initialize(void);
 void print_snapshot(void);
@@ -249,6 +252,30 @@ void inst_UpperString(unsigned int inst)
 	}
 }
 
+bool isBranchInst(unsigned int inst)
+{
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	if(opcode==0x04 || opcode==0x05 || opcode==0x07) {
+		return true;
+	}
+	return false;
+}
+bool willBranch(unsigned int inst, int rs_data, int rt_data)
+{
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	if(opcode==0x04) // beq
+	{
+		if(rs_data == rt_data) return true;
+	}
+	else if(opcode==0x05) // bne
+	{
+		if(rs_data != rt_data) return true;
+	}
+	else if( opcode == 0x07 ) // bgtz
+	{
+		if(rs_data > 0) return true;
+	}
+}
 void stage_fetch(void)
 {
 	// PCSrc == 1 ?
@@ -260,18 +287,33 @@ void stage_fetch(void)
 	unsigned int inst = instructions->at(PC/4);
 	sprintf(snapshotWriterBuffer[0], "IF: 0x%08X", inst);
 
-	CtrUnit *control;
-	if( (control = getEmptyCtrUnit())==NULL) fprintf(stderr, "No empty CtrUnit\n");
-	PC = PC + 4;
 
-	// in my code, instruction decode to control signal are done in IF stage
-	control->change(inst);
-	IF_ID_buffer_back.put(inst, control, PC);
+	if(IF_Flush){
+		PC = branch_jump_PC;
+		strcat(snapshotWriterBuffer[0], " to_be_flushed");
+		
+		CtrUnit *control;
+		if( (control = getEmptyCtrUnit())==NULL) fprintf(stderr, "No empty CtrUnit\n");
+
+		control->change(0);
+		IF_ID_buffer_back.put(0, control, PC);	
+	} 
+	else {
+		PC = PC + 4;
+
+		CtrUnit *control;
+		if( (control = getEmptyCtrUnit())==NULL) fprintf(stderr, "No empty CtrUnit\n");
+	
+		// in my code, instruction decode to control signal are done in IF stage
+		control->change(inst);
+		IF_ID_buffer_back.put(inst, control, PC);
+	}
 }
 
 int stage_decode(void)
 {
-	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
+	IF_Flush = false;
+	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst; /* when EX need to be nop at next cycle, overwrite ID_EX_buffer_back.inst with 0 */
 	/*if(cycle==DEBUG_CYCLE){
 		printf("ID In cycle %d : ", cycle);
 		print_dissembled_inst(IF_ID_buffer_front.inst);
@@ -294,15 +336,23 @@ int stage_decode(void)
 	ID_EX_buffer_back.rs_data = (int) regs->at(IF_ID_buffer_front.rs);
 	ID_EX_buffer_back.rt_data = (int) regs->at(IF_ID_buffer_front.rt);
 	ID_EX_buffer_back.extented_immediate = (signed short)IF_ID_buffer_front.immediate;
+	if(isBranchInst(IF_ID_buffer_front.inst))
+	{
+		if(willBranch(IF_ID_buffer_front.inst, ID_EX_buffer_back.rs_data, ID_EX_buffer_back.rt_data))
+		{
+			IF_Flush = true;
+			branch_jump_PC = PC + 4 + (4*(signed short)immediate);
+		}
+	}
 
 	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
 	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
 
-	if(cycle==DEBUG_CYCLE-1){
+	/*if(cycle==DEBUG_CYCLE-1){
 		printf("In cycle %d: ", cycle);
 		print_dissembled_inst(IF_ID_buffer_front.inst);
 		printf("rd==%d ,rs==%d, rt==%d\n", IF_ID_buffer_front.rd, IF_ID_buffer_front.rs, IF_ID_buffer_front.rt);
-	}
+	}*/
 	return RV_NORMAL;
 }
 
@@ -329,12 +379,12 @@ int stage_execute(void)
 	int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
 	int alu_result;
 
-	if(cycle == DEBUG_CYCLE){
+	/*if(cycle == DEBUG_CYCLE){
 		printf("In cycle %d: ",cycle);
 		print_dissembled_inst(ID_EX_buffer_front.inst);
 		printf("ALUSrc==%d, rs_data==%d, rt_data==%d, C==%d\n", ID_EX_buffer_front.control->ALUSrc, ID_EX_buffer_front.rs_data, ID_EX_buffer_front.rt_data, ID_EX_buffer_front.extented_immediate);
 		printf("alu1==%d, alu2==%d\n", aluValue1, aluValue2);
-	}
+	}*/
 
 	if(ID_EX_buffer_front.opcode == 0x00){
 		switch(ID_EX_buffer_front.funct)
@@ -697,7 +747,7 @@ int stage_writeBack(void)
 	}
 	MEM_WB_buffer_front.control->change(MEM_WB_buffer_front.inst);
 	
-	printf("cycle %d: RegWrite==%d, MemtoReg==%d, write_destination==%d", cycle, MEM_WB_buffer_front.control->RegWrite, MEM_WB_buffer_front.control->MemtoReg, MEM_WB_buffer_front.write_destination);
+	//printf("cycle %d: RegWrite==%d, MemtoReg==%d, write_destination==%d", cycle, MEM_WB_buffer_front.control->RegWrite, MEM_WB_buffer_front.control->MemtoReg, MEM_WB_buffer_front.write_destination);
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
 		if(MEM_WB_buffer_front.write_destination==0){
@@ -709,7 +759,7 @@ int stage_writeBack(void)
 		}
 		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
 		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
-		printf(", write_data==%d", write_data);
+		//printf(", write_data==%d", write_data);
 	}
 	return RV_NORMAL;
 }

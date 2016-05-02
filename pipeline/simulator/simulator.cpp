@@ -16,7 +16,7 @@
 #define RV_HALT 0
 #define RV_CRITICAL_ERROR -1
 
-#define DEBUG_CYCLE 999999
+#define DEBUG_CYCLE 4
 
 char UpperStringInst[30];
 char snapshotWriterBuffer[5][100];
@@ -50,6 +50,32 @@ int execute(void);
 void destroy_all(void);
 void sumOverflow(int aluValue1, int aluValue2);
 bool needTermination(int *stageReturnValue);
+
+void write_32bits_to_image(FILE *image, unsigned int number)
+{
+	for(int i=0 ; i<4 ; i++){
+		unsigned char temp = (unsigned char)(number >> 24);
+		fwrite(&temp, sizeof(unsigned char), 1, image);
+		number <<= 8;
+	}
+}
+void print_dissembled_inst(unsigned int inst)
+{
+	FILE *tempBin = fopen("inst_temp.bin", "wb");
+	write_32bits_to_image(tempBin, 0);
+	write_32bits_to_image(tempBin, 1);
+	write_32bits_to_image(tempBin, inst);
+	fclose(tempBin);
+
+	system("../little_bird_assembler/assembler -d inst_temp.bin -o inst_temp_dissembled.txt -nolabel");
+	
+	FILE *tempTxt = fopen("inst_temp_dissembled.txt", "r");
+	char str[200];
+	fgets(str, sizeof str, tempTxt);
+	printf("%s", str);
+	fclose(tempTxt);
+}
+
 CtrUnit * getEmptyCtrUnit(void)
 {
 	for(int i=0 ; i<30 ; i++){
@@ -246,14 +272,20 @@ void stage_fetch(void)
 int stage_decode(void)
 {
 	ID_EX_buffer_back.inst = IF_ID_buffer_front.inst;
+	/*if(cycle==DEBUG_CYCLE){
+		printf("ID In cycle %d : ", cycle);
+		print_dissembled_inst(IF_ID_buffer_front.inst);
+		//printf("IF_ID_buffer_front.rs==%d, IF_ID_buffer_front.rt==%d\n", IF_ID_buffer_front.rs, IF_ID_buffer_front.rt);
+	}*/
+
 	inst_UpperString(IF_ID_buffer_front.inst);
 	sprintf(snapshotWriterBuffer[1], "ID: %s", UpperStringInst);
 	if(IF_ID_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
+	IF_ID_buffer_front.control->change(IF_ID_buffer_front.inst);
 
 	ID_EX_buffer_back.PC_puls_4 = IF_ID_buffer_front.PC_puls_4;
-	ID_EX_buffer_back.control = IF_ID_buffer_front.control;
 
 	ID_EX_buffer_back.opcode = IF_ID_buffer_front.opcode;
 	ID_EX_buffer_back.funct = IF_ID_buffer_front.funct;
@@ -261,29 +293,48 @@ int stage_decode(void)
 
 	ID_EX_buffer_back.rs_data = (int) regs->at(IF_ID_buffer_front.rs);
 	ID_EX_buffer_back.rt_data = (int) regs->at(IF_ID_buffer_front.rt);
-	ID_EX_buffer_back.extented_immediate = (signed)IF_ID_buffer_front.immediate;
+	ID_EX_buffer_back.extented_immediate = (signed short)IF_ID_buffer_front.immediate;
 
 	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
 	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
+
+	if(cycle==DEBUG_CYCLE-1){
+		printf("In cycle %d: ", cycle);
+		print_dissembled_inst(IF_ID_buffer_front.inst);
+		printf("rd==%d ,rs==%d, rt==%d\n", IF_ID_buffer_front.rd, IF_ID_buffer_front.rs, IF_ID_buffer_front.rt);
+	}
 	return RV_NORMAL;
 }
 
 int stage_execute(void)
 {
 	EX_MEM_buffer_back.inst = ID_EX_buffer_front.inst;
+	/*if(cycle==DEBUG_CYCLE){
+		printf("EX In cycle %d : ", cycle);
+		print_dissembled_inst(ID_EX_buffer_front.inst);
+		//printf("aluValue1==%d, aluValue2==%d\n", aluValue1, aluValue2);
+	}*/
+
 	inst_UpperString(ID_EX_buffer_front.inst);
 	sprintf(snapshotWriterBuffer[2], "EX: %s", UpperStringInst);
 	if(ID_EX_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
+	ID_EX_buffer_front.control->change(ID_EX_buffer_front.inst);
 
 	// EX_MEM_buffer_back. = ID_EX_buffer_front.
-	EX_MEM_buffer_back.control = ID_EX_buffer_front.control;
 	EX_MEM_buffer_back.PC_result = ID_EX_buffer_front.PC_puls_4 + (ID_EX_buffer_front.extented_immediate << 2);
 
 	int aluValue1 = ID_EX_buffer_front.rs_data;
 	int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
 	int alu_result;
+
+	if(cycle == DEBUG_CYCLE){
+		printf("In cycle %d: ",cycle);
+		print_dissembled_inst(ID_EX_buffer_front.inst);
+		printf("ALUSrc==%d, rs_data==%d, rt_data==%d, C==%d\n", ID_EX_buffer_front.control->ALUSrc, ID_EX_buffer_front.rs_data, ID_EX_buffer_front.rt_data, ID_EX_buffer_front.extented_immediate);
+		printf("alu1==%d, alu2==%d\n", aluValue1, aluValue2);
+	}
 
 	if(ID_EX_buffer_front.opcode == 0x00){
 		switch(ID_EX_buffer_front.funct)
@@ -471,12 +522,18 @@ int stage_execute(void)
 int stage_memory(void)
 {
 	MEM_WB_buffer_back.inst = EX_MEM_buffer_front.inst;
+	/*if(cycle==DEBUG_CYCLE){
+		printf("MEM In cycle %d : ", cycle);
+		print_dissembled_inst(EX_MEM_buffer_front.inst);
+	}*/
+
 	inst_UpperString(EX_MEM_buffer_front.inst);
 	sprintf(snapshotWriterBuffer[3], "DM: %s", UpperStringInst);
 	if(EX_MEM_buffer_front.inst == 0xffffffff) {
 		return RV_HALT;
 	}
-	MEM_WB_buffer_back.control = EX_MEM_buffer_front.control;
+	EX_MEM_buffer_front.control->change(EX_MEM_buffer_front.inst);
+
 	int location = EX_MEM_buffer_front.ALU_result;
 	int rt_data = EX_MEM_buffer_front.rt_data;
 	int tempValue, toReturn=0;
@@ -629,10 +686,18 @@ int stage_memory(void)
 int stage_writeBack(void)
 {
 	inst_UpperString(MEM_WB_buffer_front.inst);
+	/*if(cycle==DEBUG_CYCLE){
+		printf("WB In cycle %d : ", cycle);
+		print_dissembled_inst(MEM_WB_buffer_front.inst);
+	}*/
+
 	sprintf(snapshotWriterBuffer[4], "WB: %s", UpperStringInst);
 	if(MEM_WB_buffer_front.inst == 0xffffffff){
 		return RV_HALT;
 	}
+	MEM_WB_buffer_front.control->change(MEM_WB_buffer_front.inst);
+	
+	printf("cycle %d: RegWrite==%d, MemtoReg==%d, write_destination==%d", cycle, MEM_WB_buffer_front.control->RegWrite, MEM_WB_buffer_front.control->MemtoReg, MEM_WB_buffer_front.write_destination);
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
 		if(MEM_WB_buffer_front.write_destination==0){
@@ -644,6 +709,7 @@ int stage_writeBack(void)
 		}
 		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
 		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
+		printf(", write_data==%d", write_data);
 	}
 	return RV_NORMAL;
 }
@@ -714,11 +780,23 @@ int main(int argc, char const *argv[])
 		//printf("%s\n", snapshotWriterBuffer[0]);
 
 
+		printf("\ncycle %d: \n", cycle);
+
+		printf("ID : ");
+		print_dissembled_inst(IF_ID_buffer_front.inst);
+		printf("EX : ");
+		print_dissembled_inst(ID_EX_buffer_front.inst);
+		printf("MEM : ");
+		print_dissembled_inst(EX_MEM_buffer_front.inst);
+		printf("WB : ");
+		print_dissembled_inst(MEM_WB_buffer_front.inst);
+
+
 		trigger();
-		printf("\ncycle %d: ", cycle);
+
+
 		for(int i=0 ; i<5 ; i++){
 			fprintf(snapshot, "%s\n", snapshotWriterBuffer[i]);
-			printf("%s\n", snapshotWriterBuffer[i]);
 		}
 
 		fprintf(snapshot, "\n\n");
@@ -786,6 +864,10 @@ void readInput_initialize(void)
 	ID_EX_buffer_front.control = getEmptyCtrUnit();
 	EX_MEM_buffer_front.control = getEmptyCtrUnit();
 	MEM_WB_buffer_front.control = getEmptyCtrUnit();
+	IF_ID_buffer_back.control = getEmptyCtrUnit();
+	ID_EX_buffer_back.control = getEmptyCtrUnit();
+	EX_MEM_buffer_back.control = getEmptyCtrUnit();
+	MEM_WB_buffer_back.control = getEmptyCtrUnit();
 }
 
 

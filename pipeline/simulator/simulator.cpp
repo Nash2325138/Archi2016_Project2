@@ -275,6 +275,7 @@ bool willBranch(unsigned int inst, int rs_data, int rt_data)
 	{
 		if(rs_data > 0) return true;
 	}
+	return false;
 }
 void stage_fetch(void)
 {
@@ -341,7 +342,7 @@ int stage_decode(void)
 		if(willBranch(IF_ID_buffer_front.inst, ID_EX_buffer_back.rs_data, ID_EX_buffer_back.rt_data))
 		{
 			IF_Flush = true;
-			branch_jump_PC = PC + 4 + (4*(signed short)immediate);
+			branch_jump_PC = PC + 4 + (4*ID_EX_buffer_back.extented_immediate);
 		}
 	}
 

@@ -279,7 +279,6 @@ bool willBranch(unsigned int inst, int rs_data, int rt_data)
 }
 void stage_fetch(void)
 {
-	
 	unsigned int inst = instructions->at(PC/4);
 	sprintf(snapshotWriterBuffer[0], "IF: 0x%08X", inst);
 
@@ -334,6 +333,7 @@ int stage_decode(void)
 	ID_EX_buffer_back.extented_immediate = (signed short)IF_ID_buffer_front.immediate;
 	if(isBranchInst(IF_ID_buffer_front.inst))
 	{
+
 		if(willBranch(IF_ID_buffer_front.inst, ID_EX_buffer_back.rs_data, ID_EX_buffer_back.rt_data))
 		{
 			IF_Flush = true;
@@ -369,8 +369,7 @@ int stage_execute(void)
 	ID_EX_buffer_front.control->change(ID_EX_buffer_front.inst);
 
 	// EX_MEM_buffer_back. = ID_EX_buffer_front.
-	EX_MEM_buffer_back.PC_result = ID_EX_buffer_front.PC_puls_4 + (ID_EX_buffer_front.extented_immediate << 2);
-
+	
 	int aluValue1 = ID_EX_buffer_front.rs_data;
 	int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
 	int alu_result;

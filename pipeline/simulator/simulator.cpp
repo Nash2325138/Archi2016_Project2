@@ -279,12 +279,7 @@ bool willBranch(unsigned int inst, int rs_data, int rt_data)
 }
 void stage_fetch(void)
 {
-	// PCSrc == 1 ?
-	if(EX_MEM_buffer_front.control->Branch && EX_MEM_buffer_front.ALU_zero){
-		PC = EX_MEM_buffer_front.PC_result;
-	} else {
-		// PC value remains
-	}
+	
 	unsigned int inst = instructions->at(PC/4);
 	sprintf(snapshotWriterBuffer[0], "IF: 0x%08X", inst);
 

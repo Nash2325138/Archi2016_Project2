@@ -586,9 +586,153 @@ int calc_AluValue2_src(unsigned int inst)
 	}
 }
 
-bool isStallPosiibleInExcuteStage(unsigned int inst)
+void posiibleStall_nonBranchJump(unsigned int inst, bool *rs_required, bool *rt_required)
 {
-	return true;
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	unsigned char funct = (unsigned char) (inst & 0x3f);			
+	if(opcode == 0x00){
+		switch(funct)
+		{
+			*rs_required = true;
+			*rt_required = true;
+			case 0x20:	// add
+				break;
+
+			case 0x21:	// addu
+				break;
+
+			case 0x22:	// sub
+				break;
+
+			case 0x24:	// and
+				break;
+
+			case 0x25:	// or
+				break;
+
+			case 0x26:	//xor
+				break;
+
+			case 0x27:	//nor
+				break;
+
+			case 0x28:	//nand
+				break;
+
+			case 0x2a:	//slt
+				break;
+
+			case 0x00:	//sll
+				*rs_required = false;
+				break;
+
+			case 0x02:	//srl
+				*rs_required = false;
+				break;
+
+			case 0x03:	//sra
+				*rs_required = false;	
+				break;
+
+			case 0x08:	//jr
+				*rs_required = false;
+				fprintf(stderr, "jr should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+
+			default: break;
+		}
+	} else {
+		*rs_required = true;
+		*rt_required = false;
+		switch(opcode)
+		{
+			case 0x08: 	// addi
+				break;
+
+			case 0x09:	// addiu
+				break;
+
+			case 0x23:	//lw
+				break;
+
+			case 0x21:	//lh
+				break;
+
+			case 0x25:	//lhu 
+				break;
+
+			case 0x20:	//lb 
+				break;
+
+			case 0x24:	//lbu
+				break;
+
+			case 0x2B:	//sw
+				*rt_required = true;
+				break;
+
+			case 0x29:	//sh
+				*rt_required = true;
+				break;
+
+			case 0x28:	//sb
+				*rt_required = true;
+				break;
+
+			case 0x0F:	//lui 
+				break;
+
+			case 0x0C:	//andi 
+				break;
+
+			case 0x0D:	//ori 
+				break;
+
+			case 0x0E:	//nori 
+				break;
+			
+			case 0x0A:	//slti
+				break;
+
+			case 0x04:	//beq
+				*rt_required = true;
+				fprintf(stderr, "beq should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+
+			case 0x05:	//bne 
+				*rt_required = true;
+				fprintf(stderr, "bne should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+			
+			case 0x07:	//bgtz 
+				fprintf(stderr, "bgtz should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+			//--------------------------- I type end -----------------------------//
+
+
+			//--------------------------- J type start -----------------------------//
+			case 0x02:	//j
+				*rs_required = false;
+				fprintf(stderr, "j should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+
+			case 0x03:	//jal
+				*rs_required = false;
+				fprintf(stderr, "jal should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+			//--------------------------- J type end -----------------------------//
+
+
+			
+			case 0x3f:	// halt
+				*rs_required = false;
+				fprintf(stderr, "halt should not be tested at posiibleStall_nonBranchJump()\n");
+				break;
+			default:
+				fputs("no such instruction", stderr);
+				break;
+		}
+	}
 }
 
 int stage_decode(void)
@@ -648,9 +792,6 @@ int stage_decode(void)
 			}
 		}
 	}*/
-
-	// all stall detection except for branch instructions or jr
-	//if()
 
 	if(isBranchInst(IF_ID_buffer_front.inst)) // branch instructions
 	{
@@ -781,7 +922,6 @@ int stage_decode(void)
 				}
 				// if no stall, then no return, then needs flush and PC change
 				IF_Flush = true;
-				unsigned int address = IF_ID_buffer_front.inst & 0x3ffffff;
 				branch_jump_PC = real_rs_data;
 			}
 			else
@@ -800,6 +940,65 @@ int stage_decode(void)
 		
 	}
 
+	// all possible stall detection except for Branch or Jump
+	else
+	{
+		bool rs_required, rt_required;
+		posiibleStall_nonBranchJump(IF_ID_buffer_front.inst, &rs_required, &rt_required);
+		if(rs_required)
+		{
+			// when ID (not branch or jump) needs ID/EX's data, 
+			// ID can move on to EX to get forwarding by EX/MEM at next cycle
+			// if and only if ID/EX is not a load word instructions
+			if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination is EX's write destination
+			{
+				if( IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination )
+				{
+					if( ID_EX_buffer_front.control->MemRead ) // load word instructions
+					{
+						// needs stall	
+					}
+					else; // do nothing, just move on to get forwarding by EX/MEM at next cycle
+				}
+			}
+			// whenever ID (not branch or jump) needs EX/MEM's data, it just need to stall 
+			// (because there's no forwarding path for MEM/RB->EX at this project)
+			if(EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+			{
+				if( IF_ID_buffer_front.rs == EX_MEM_buffer_front.write_destination )
+				{
+					// needs stall
+				}
+			}
+
+		}
+		if(rt_required)
+		{
+			// when ID (not branch or jump) needs ID/EX's data, 
+			// ID can move on to EX to get forwarding by EX/MEM at next cycle
+			// if and only if ID/EX is not a load word instructions
+			if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination is EX's write destination
+			{
+				if( IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination )
+				{
+					if( ID_EX_buffer_front.control->MemRead ) // load word instructions
+					{
+						// needs stall	
+					}
+					else; // do nothing, just move on to get forwarding by EX/MEM at next cycle
+				}
+			}
+			// whenever ID (not branch or jump) needs EX/MEM's data, it just need to stall 
+			// (because there's no forwarding path for MEM/RB->EX at this project)
+			if(EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+			{
+				if( IF_ID_buffer_front.rt == EX_MEM_buffer_front.write_destination )
+				{
+					// needs stall
+				}
+			}
+		}
+	}
 
 	/*if(cycle==DEBUG_CYCLE-1){
 		printf("In cycle %d: ", cycle);

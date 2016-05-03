@@ -586,6 +586,11 @@ int calc_AluValue2_src(unsigned int inst)
 	}
 }
 
+bool isStallPosiibleInExcuteStage(unsigned int inst)
+{
+	return true;
+}
+
 int stage_decode(void)
 {
 	IF_Flush = false;
@@ -616,13 +621,14 @@ int stage_decode(void)
 	ID_EX_buffer_back.rt_data = (int) regs->at(IF_ID_buffer_front.rt);
 	ID_EX_buffer_back.extented_immediate = (signed short)IF_ID_buffer_front.immediate;
 
-	if(IF_ID_buffer_front.control->MemWrite) // store word instructions
+	/*if(IF_ID_buffer_front.control->MemWrite) // store word instructions
 	{
+		char temp[200];
 		// forward or stall detection
 		// whenever ID needs ID/EX's data, ID needs stall
-		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 		{
-			if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+			if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 			{
 				// needs stall
 			}
@@ -641,32 +647,34 @@ int stage_decode(void)
 				}
 			}
 		}
-	}
+	}*/
 
+	// all stall detection except for branch instructions or jr
+	//if()
 
-	else if(isBranchInst(IF_ID_buffer_front.inst)) // branch instructions
+	if(isBranchInst(IF_ID_buffer_front.inst)) // branch instructions
 	{
 		int real_rs_data = ID_EX_buffer_back.rs_data;	// if it's not real(need forwarding), then overwrite its value later 
 		int real_rt_data = ID_EX_buffer_back.rt_data;	// same as above
 
 		// forward or stall detection
 		// whenever ID needs ID/EX's data, ID needs stall
-		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 		{
 			if(IF_ID_buffer_front.opcode == 0x04 || IF_ID_buffer_front.opcode == 0x05) // beq or bne
 			{
-				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 				{
 					// needs stall
 				}
-				if(IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+				if(IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 				{
 					// needs stall
 				}
 			}
 			else if(IF_ID_buffer_front.opcode == 0x07) // bgtz
 			{
-				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 				{
 					// needs stall
 				}
@@ -742,7 +750,6 @@ int stage_decode(void)
 
 	else if(IF_ID_buffer_front.control->Jump)	// sw series and Branch and Jump will never happen together
 	{
-		IF_Flush = true;
 
 		if(IF_ID_buffer_front.opcode == 0x00)
 		{
@@ -750,9 +757,9 @@ int stage_decode(void)
 			{
 				int real_rs_data = (int) regs->at(IF_ID_buffer_front.rs);
 				// forward or stall detection
-				if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+				if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 				{
-					if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
+					if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination
 					{
 						// needs stall
 					}
@@ -767,10 +774,14 @@ int stage_decode(void)
 						}
 						else
 						{
+							// needs forwarding
 							real_rs_data = EX_MEM_buffer_front.ALU_result;
 						}
 					}
 				}
+				// if no stall, then no return, then needs flush and PC change
+				IF_Flush = true;
+				unsigned int address = IF_ID_buffer_front.inst & 0x3ffffff;
 				branch_jump_PC = real_rs_data;
 			}
 			else
@@ -778,6 +789,8 @@ int stage_decode(void)
 		}
 		else if( IF_ID_buffer_front.opcode == 0x02 || IF_ID_buffer_front.opcode == 0x03) // j or jal
 		{
+			// don't need any stall or forwarding
+			IF_Flush = true;
 			unsigned int address = IF_ID_buffer_front.inst & 0x3ffffff;
 			branch_jump_PC = IF_ID_buffer_front.PC_puls_4 & 0xf0000000;
 			branch_jump_PC |= ( ((unsigned int)address) << 2 );
@@ -1048,7 +1061,12 @@ int stage_execute(void)
 	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
 	EX_MEM_buffer_back.PC_puls_4 = ID_EX_buffer_front.PC_puls_4;
 
-	EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
+	if(ID_EX_buffer_front.opcode == 0x03) { 		// jal
+		EX_MEM_buffer_back.write_destination = 31;
+		EX_MEM_buffer_back.ALU_result = ID_EX_buffer_front.PC_puls_4; // overwrite ALU_result
+	}
+	else
+		EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
 	return RV_NORMAL;
 }
 int stage_memory(void)
@@ -1234,13 +1252,6 @@ int stage_writeBack(void)
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
 		int write_data;
-
-		if(MEM_WB_buffer_front.control->Jump){
-			write_data = MEM_WB_buffer_front.PC_puls_4;
-			regs->at(31) = write_data;
-			return RV_NORMAL;
-		}
-
 		if(MEM_WB_buffer_front.write_destination==0){
 			if( (MEM_WB_buffer_front.inst & 0xf8000000)==0 ) {}		//NOP
 			else {

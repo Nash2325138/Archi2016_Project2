@@ -25,7 +25,7 @@
 #define DEBUG_CYCLE 4
 
 char UpperStringInst[30];
-char snapshotWriterBuffer[5][100];
+char snapshotWriterBuffer[5][200];
 
 FILE *snapshot;
 FILE *error_dump;
@@ -609,29 +609,174 @@ int stage_decode(void)
 	ID_EX_buffer_back.funct = IF_ID_buffer_front.funct;
 	ID_EX_buffer_back.shamt = IF_ID_buffer_front.shamt;
 
+	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
+	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
+
 	ID_EX_buffer_back.rs_data = (int) regs->at(IF_ID_buffer_front.rs);
 	ID_EX_buffer_back.rt_data = (int) regs->at(IF_ID_buffer_front.rt);
 	ID_EX_buffer_back.extented_immediate = (signed short)IF_ID_buffer_front.immediate;
-	if(isBranchInst(IF_ID_buffer_front.inst))
-	{
 
-		if(willBranch(IF_ID_buffer_front.inst, ID_EX_buffer_back.rs_data, ID_EX_buffer_back.rt_data))
+	if(IF_ID_buffer_front.control->MemWrite) // store word instructions
+	{
+		// forward or stall detection
+		// whenever ID needs ID/EX's data, ID needs stall
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+		{
+			if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+			{
+				// needs stall
+			}
+		}
+		if(EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+		{
+			if(IF_ID_buffer_front.rs == EX_MEM_buffer_front.write_destination)
+			{
+				if(EX_MEM_buffer_front.control->MemRead) // load word instruction
+				{
+					// needs stall
+				}
+				else
+				{
+					// needs forwarding
+				}
+			}
+		}
+	}
+
+
+	else if(isBranchInst(IF_ID_buffer_front.inst)) // branch instructions
+	{
+		int real_rs_data = ID_EX_buffer_back.rs_data;	// if it's not real(need forwarding), then overwrite its value later 
+		int real_rt_data = ID_EX_buffer_back.rt_data;	// same as above
+
+		// forward or stall detection
+		// whenever ID needs ID/EX's data, ID needs stall
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+		{
+			if(IF_ID_buffer_front.opcode == 0x04 || IF_ID_buffer_front.opcode == 0x05) // beq or bne
+			{
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+				{
+					// needs stall
+				}
+				if(IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination)
+				{
+					// needs stall
+				}
+			}
+			else if(IF_ID_buffer_front.opcode == 0x07) // bgtz
+			{
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+				{
+					// needs stall
+				}
+			}
+			else
+				fprintf(stderr, "%s\n", "Branch signal is true but not a Branch instruction");
+		}
+		// when ID needs EX/MEM's data, ID needs stall if EX/MEM are load memory instruction, but ID needs forwarding if EX/MEM are one of other instructions
+		if(EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+		{
+			char temp[200];
+			if(IF_ID_buffer_front.opcode == 0x04 || IF_ID_buffer_front.opcode == 0x05) // beq or bne
+			{
+				// if it's beq or bne, rs and rt are both needed to detect stall of forwarding
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_front.write_destination)
+				{
+					if(EX_MEM_buffer_front.control->MemRead) // load word instructions
+					{
+						// needs stall
+					}
+					else
+					{
+						// needs forwarding
+						sprintf(temp, " fwd_EX-DM_rs_$%d", IF_ID_buffer_front.rs);
+						strcat(snapshotWriterBuffer[1], temp);
+						real_rs_data = EX_MEM_buffer_front.ALU_result;
+					}
+				}
+				if(IF_ID_buffer_front.rt == EX_MEM_buffer_front.write_destination)
+				{
+					if(EX_MEM_buffer_front.control->MemRead) // load word instruction
+					{
+						// needs stall
+					}
+					else
+					{
+						// needs forwarding
+						sprintf(temp, " fwd_EX-DM_rt_$%d", IF_ID_buffer_front.rt);
+						strcat(snapshotWriterBuffer[1], temp);
+						real_rt_data = EX_MEM_buffer_front.ALU_result;
+					}
+				}
+			}
+			else if(IF_ID_buffer_front.opcode == 0x07) // bgtz
+			{
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_front.write_destination)
+				{
+					if(EX_MEM_buffer_front.control->MemRead) // load word instructions
+					{
+						// needs stall
+					}
+					else
+					{
+						// needs forwarding
+						sprintf(temp, " fwd_EX-DM_rs_$%d", IF_ID_buffer_front.rs);
+						strcat(snapshotWriterBuffer[1], temp);
+						real_rs_data = EX_MEM_buffer_front.ALU_result;
+					}
+					
+				}
+			}
+			else
+				fprintf(stderr, "%s\n", "Branch signal is true but not a Branch instruction");
+		}
+		
+		if(willBranch(IF_ID_buffer_front.inst, real_rs_data, real_rt_data))
 		{
 			IF_Flush = true;
 			branch_jump_PC = ID_EX_buffer_back.PC_puls_4 + (4*ID_EX_buffer_back.extented_immediate);
 		}
 	}
-	if(IF_ID_buffer_front.control->Jump)
+
+
+	else if(IF_ID_buffer_front.control->Jump)	// sw series and Branch and Jump will never happen together
 	{
 		IF_Flush = true;
+
 		if(IF_ID_buffer_front.opcode == 0x00)
 		{
-			if(IF_ID_buffer_front.funct == 0x08)
-				branch_jump_PC = (int) regs->at(IF_ID_buffer_front.rs);
+			if(IF_ID_buffer_front.funct == 0x08) // jr
+			{
+				int real_rs_data = (int) regs->at(IF_ID_buffer_front.rs);
+				// forward or stall detection
+				if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+				{
+					if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) /* EX_MEM_buffer_back.write_destination  is now EX's write destination*/
+					{
+						// needs stall
+					}
+				}
+				if(EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+				{
+					if(IF_ID_buffer_front.rs == EX_MEM_buffer_front.write_destination)
+					{
+						if(EX_MEM_buffer_front.control->MemRead) // load word instructions
+						{
+							// needs stall
+						}
+						else
+						{
+							real_rs_data = EX_MEM_buffer_front.ALU_result;
+						}
+					}
+				}
+				branch_jump_PC = real_rs_data;
+			}
 			else
 				fprintf(stderr, "%s\n", "Jump signal is true but not a Jump instruction");
 		}
-		else if( IF_ID_buffer_front.opcode == 0x02 || IF_ID_buffer_front.opcode == 0x03)
+		else if( IF_ID_buffer_front.opcode == 0x02 || IF_ID_buffer_front.opcode == 0x03) // j or jal
 		{
 			unsigned int address = IF_ID_buffer_front.inst & 0x3ffffff;
 			branch_jump_PC = IF_ID_buffer_front.PC_puls_4 & 0xf0000000;
@@ -642,8 +787,6 @@ int stage_decode(void)
 		
 	}
 
-	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
-	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
 
 	/*if(cycle==DEBUG_CYCLE-1){
 		printf("In cycle %d: ", cycle);
@@ -1091,7 +1234,7 @@ int stage_writeBack(void)
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
 		int write_data;
-		
+
 		if(MEM_WB_buffer_front.control->Jump){
 			write_data = MEM_WB_buffer_front.PC_puls_4;
 			regs->at(31) = write_data;

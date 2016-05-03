@@ -1039,10 +1039,7 @@ int stage_execute(void)
 				break;
 
 			case 0x03:	//jal
-				//if(toReturn!=0) return toReturn;
-				//regs->at(31) = PC;
-				//PC &= 0xf0000000;
-				//PC |= ( ((unsigned int)address) << 2 );
+				alu_result = ID_EX_buffer_front.PC_puls_4;
 				break;
 			//--------------------------- J type end -----------------------------//
 
@@ -1063,10 +1060,10 @@ int stage_execute(void)
 
 	if(ID_EX_buffer_front.opcode == 0x03) { 		// jal
 		EX_MEM_buffer_back.write_destination = 31;
-		EX_MEM_buffer_back.ALU_result = ID_EX_buffer_front.PC_puls_4; // overwrite ALU_result
 	}
-	else
+	else{
 		EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
+	}
 	return RV_NORMAL;
 }
 int stage_memory(void)

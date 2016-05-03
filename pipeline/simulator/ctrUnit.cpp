@@ -218,7 +218,7 @@ void CtrUnit::change(unsigned int inst)
 				break;
 
 			case 0x03:	//jal
-				RegWrite = false;
+				RegWrite = true;
 				break;
 			//--------------------------- J type end -----------------------------//
 

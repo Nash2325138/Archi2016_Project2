@@ -49,7 +49,7 @@ class EX_MEM_Buffer
 {
 public:
 	unsigned int inst;
-	unsigned int PC_result;
+	unsigned int PC_puls_4;
 	CtrUnit *control;
 
 	bool ALU_zero;
@@ -65,6 +65,7 @@ class MEM_WB_Buffer
 {
 public:
 	unsigned int inst;
+	unsigned int PC_puls_4;
 	CtrUnit *control;
 	int ALU_result;
 	int memory_result;

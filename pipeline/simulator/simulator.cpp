@@ -16,6 +16,12 @@
 #define RV_HALT 0
 #define RV_CRITICAL_ERROR -1
 
+#define ALU_RS_DATA 0
+#define ALU_RT_DATA 1
+#define ALU_SHAMT 2
+#define ALU_IMMEDIATE 3
+#define ALU_NONE 4
+
 #define DEBUG_CYCLE 4
 
 char UpperStringInst[30];
@@ -304,6 +310,281 @@ void stage_fetch(void)
 		IF_ID_buffer_back.put(inst, control, PC);
 	}
 }
+int calc_AluValue1_src(unsigned int inst)
+{
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	unsigned char funct = (unsigned char) (inst & 0x3f);			
+	if(opcode == 0x00){
+		switch(funct)
+		{
+			case 0x20:	// add
+				break;
+
+			case 0x21:	// addu
+				break;
+
+			case 0x22:	// sub
+				break;
+
+			case 0x24:	// and
+				break;
+
+			case 0x25:	// or
+				break;
+
+			case 0x26:	//xor
+				break;
+
+			case 0x27:	//nor
+				break;
+
+			case 0x28:	//nand
+				break;
+
+			case 0x2a:	//slt
+				break;
+
+			case 0x00:	//sll
+				return ALU_RT_DATA;
+				break;
+
+			case 0x02:	//srl
+				return ALU_RT_DATA;
+				break;
+
+			case 0x03:	//sra
+				return ALU_RT_DATA;	
+				break;
+
+			case 0x08:	//jr
+				return ALU_NONE;
+				break;
+
+			default: break;
+		}
+		return ALU_RS_DATA;
+	} else {
+		switch(opcode)
+		{
+			case 0x08: 	// addi
+				break;
+
+			case 0x09:	// addiu
+				break;
+
+			case 0x23:	//lw
+				break;
+
+			case 0x21:	//lh
+				break;
+
+			case 0x25:	//lhu 
+				break;
+
+			case 0x20:	//lb 
+				break;
+
+			case 0x24:	//lbu
+				break;
+
+			case 0x2B:	//sw
+				break;
+
+			case 0x29:	//sh
+				break;
+
+			case 0x28:	//sb
+				break;
+
+			case 0x0F:	//lui 
+				return ALU_NONE;
+				break;
+
+			case 0x0C:	//andi 
+				break;
+
+			case 0x0D:	//ori 
+				break;
+
+			case 0x0E:	//nori 
+				break;
+			
+			case 0x0A:	//slti
+				break;
+
+			case 0x04:	//beq
+				return ALU_NONE;
+				break;
+
+			case 0x05:	//bne 
+				return ALU_NONE;
+				break;
+			
+			case 0x07:	//bgtz 
+				return ALU_NONE;
+				break;
+			//--------------------------- I type end -----------------------------//
+
+
+			//--------------------------- J type start -----------------------------//
+			case 0x02:	//j
+				return ALU_NONE;
+				break;
+
+			case 0x03:	//jal
+				return ALU_NONE;
+				break;
+			//--------------------------- J type end -----------------------------//
+
+
+			
+			case 0x3f:	// halt
+				return ALU_NONE;
+				break;
+			default:
+				fputs("no such instruction", stderr);
+				break;
+		}
+		return ALU_RS_DATA;
+	}
+}
+int calc_AluValue2_src(unsigned int inst)
+{
+	unsigned char opcode = (unsigned char) (inst >> 26);		//warning: unsigned char has 8 bits
+	unsigned char funct = (unsigned char) (inst & 0x3f);			
+	if(opcode == 0x00){
+		switch(funct)
+		{
+			case 0x20:	// add
+				break;
+
+			case 0x21:	// addu
+				break;
+
+			case 0x22:	// sub
+				break;
+
+			case 0x24:	// and
+				break;
+
+			case 0x25:	// or
+				break;
+
+			case 0x26:	//xor
+				break;
+
+			case 0x27:	//nor
+				break;
+
+			case 0x28:	//nand
+				break;
+
+			case 0x2a:	//slt
+				break;
+
+			case 0x00:	//sll
+				return ALU_SHAMT;
+				break;
+
+			case 0x02:	//srl
+				return ALU_SHAMT;
+				break;
+
+			case 0x03:	//sra
+				return ALU_SHAMT;	
+				break;
+
+			case 0x08:	//jr
+				return ALU_NONE;
+				break;
+
+			default: break;
+		}
+		return ALU_RT_DATA;
+	} else {
+		switch(opcode)
+		{
+			case 0x08: 	// addi
+				break;
+
+			case 0x09:	// addiu
+				break;
+
+			case 0x23:	//lw
+				break;
+
+			case 0x21:	//lh
+				break;
+
+			case 0x25:	//lhu 
+				break;
+
+			case 0x20:	//lb 
+				break;
+
+			case 0x24:	//lbu
+				break;
+
+			case 0x2B:	//sw
+				break;
+
+			case 0x29:	//sh
+				break;
+
+			case 0x28:	//sb
+				break;
+
+			case 0x0F:	//lui 
+				break;
+
+			case 0x0C:	//andi 
+				break;
+
+			case 0x0D:	//ori 
+				break;
+
+			case 0x0E:	//nori 
+				break;
+			
+			case 0x0A:	//slti
+				break;
+
+			case 0x04:	//beq
+				return ALU_NONE;
+				break;
+
+			case 0x05:	//bne 
+				return ALU_NONE;
+				break;
+			
+			case 0x07:	//bgtz 
+				return ALU_NONE;
+				break;
+			//--------------------------- I type end -----------------------------//
+
+
+			//--------------------------- J type start -----------------------------//
+			case 0x02:	//j
+				return ALU_NONE;
+				break;
+
+			case 0x03:	//jal
+				return ALU_NONE;
+				break;
+			//--------------------------- J type end -----------------------------//
+
+
+			
+			case 0x3f:	// halt
+				return ALU_NONE;
+				break;
+			default:
+				fputs("no such instruction", stderr);
+				break;
+		}
+		return ALU_IMMEDIATE;
+	}
+}
 
 int stage_decode(void)
 {
@@ -370,8 +651,50 @@ int stage_execute(void)
 
 	// EX_MEM_buffer_back. = ID_EX_buffer_front.
 	
-	int aluValue1 = ID_EX_buffer_front.rs_data;
-	int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
+	//int aluValue1 = ID_EX_buffer_front.rs_data;
+	//int aluValue2 = (ID_EX_buffer_front.control->ALUSrc) ? ID_EX_buffer_front.extented_immediate : ID_EX_buffer_front.rt_data;
+	int aluValue1;
+	int aluValue2;
+	switch(calc_AluValue1_src(ID_EX_buffer_front.inst))
+	{
+		case ALU_RS_DATA:
+			aluValue1 = ID_EX_buffer_front.rs_data;
+			break;
+		case ALU_RT_DATA:
+			aluValue1 = ID_EX_buffer_front.rt_data;
+			break;
+		case ALU_IMMEDIATE:
+			fprintf(stderr, "It's not possible that aluValue1 == immediate\n");
+			break;
+		case ALU_SHAMT:
+			fprintf(stderr, "It's not possible that aluValue1 == shamt\n");
+			break;
+		case ALU_NONE:
+			break;
+		default:
+			fprintf(stderr, "no match aluValue1 source\n");
+			break;
+	}
+	switch(calc_AluValue2_src(ID_EX_buffer_front.inst))
+	{
+		case ALU_RS_DATA:
+			fprintf(stderr, "It's not possible that aluValue2 == rs_data\n");
+			break;
+		case ALU_RT_DATA:
+			aluValue2 = ID_EX_buffer_front.rt_data;
+			break;
+		case ALU_IMMEDIATE:
+			aluValue2 = ID_EX_buffer_front.extented_immediate;
+			break;
+		case ALU_SHAMT:
+			aluValue2 = ID_EX_buffer_front.shamt;
+			break;
+		case ALU_NONE:
+			break;
+		default:
+			fprintf(stderr, "no match aluValue2 source\n");
+			break;
+	}
 	int alu_result;
 
 	/*if(cycle == DEBUG_CYCLE){
@@ -519,15 +842,15 @@ int stage_execute(void)
 
 			// ---------- in project 2, branch and jump should be done at ID stage !!!! ---------- //
 			case 0x04:	//beq
-				EX_MEM_buffer_back.ALU_zero = ( aluValue1==aluValue2 ) ? true : false;
+				//EX_MEM_buffer_back.ALU_zero = ( aluValue1==aluValue2 ) ? true : false;
 				break;
 
 			case 0x05:	//bne 
-				EX_MEM_buffer_back.ALU_zero = ( aluValue1!=aluValue2 ) ? true : false;
+				//EX_MEM_buffer_back.ALU_zero = ( aluValue1!=aluValue2 ) ? true : false;
 				break;
 			
 			case 0x07:	//bgtz 
-				EX_MEM_buffer_back.ALU_zero = ( aluValue1 > 0 ) ? true : false;
+				//EX_MEM_buffer_back.ALU_zero = ( aluValue1 > 0 ) ? true : false;
 				break;
 			//--------------------------- I type end -----------------------------//
 

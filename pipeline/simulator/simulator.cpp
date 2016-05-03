@@ -620,9 +620,9 @@ int stage_decode(void)
 	{
 		// forward or stall detection
 		// whenever ID needs ID/EX's data, ID needs stall
-		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 		{
-			if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+			if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 			{
 				// needs stall
 			}
@@ -651,22 +651,22 @@ int stage_decode(void)
 
 		// forward or stall detection
 		// whenever ID needs ID/EX's data, ID needs stall
-		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+		if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 		{
 			if(IF_ID_buffer_front.opcode == 0x04 || IF_ID_buffer_front.opcode == 0x05) // beq or bne
 			{
-				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 				{
 					// needs stall
 				}
-				if(IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination)
+				if(IF_ID_buffer_front.rt == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 				{
 					// needs stall
 				}
 			}
 			else if(IF_ID_buffer_front.opcode == 0x07) // bgtz
 			{
-				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination)
+				if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 				{
 					// needs stall
 				}
@@ -750,9 +750,9 @@ int stage_decode(void)
 			{
 				int real_rs_data = (int) regs->at(IF_ID_buffer_front.rs);
 				// forward or stall detection
-				if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0)
+				if(ID_EX_buffer_front.control->RegWrite && EX_MEM_buffer_back.write_destination != 0) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 				{
-					if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) /* EX_MEM_buffer_back.write_destination  is now EX's write destination*/
+					if(IF_ID_buffer_front.rs == EX_MEM_buffer_back.write_destination) // EX_MEM_buffer_back.write_destination  is now EX's write destination */
 					{
 						// needs stall
 					}

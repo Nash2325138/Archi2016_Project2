@@ -642,15 +642,15 @@ int posiibleStall_nonBranchJump(unsigned int inst)
 				break;
 
 			case 0x00:	//sll
-				retVal = 0x2;
+				retVal = 0x1;
 				break;
 
 			case 0x02:	//srl
-				retVal = 0x2;
+				retVal = 0x1;
 				break;
 
 			case 0x03:	//sra
-				retVal = 0x2;	
+				retVal = 0x1;	
 				break;
 
 			case 0x08:	//jr
@@ -1415,7 +1415,6 @@ int stage_memory(void)
 				break;
 		}
 	}
-	if(cycle==5) printf("cycle %d, memory->at(location): %d\n", cycle, memory->at(location));
 	if(EX_MEM_buffer_front.control->MemRead){
 
 		signed short halfLoaded;
@@ -1624,7 +1623,7 @@ int main(int argc, char const *argv[])
 		//printf("%s\n", snapshotWriterBuffer[0]);
 
 
-		if(cycle==5 || cycle==6)
+		if(cycle==34)
 		{
 			printf("\ncycle %d:\n", cycle);
 			print_buffer_front();
@@ -1655,12 +1654,13 @@ void print_buffer_front(void)
 
 	printf("ID: ");
 	print_dissembled_inst(IF_ID_buffer_front.inst);
-	//printf("required: %d\n", posiibleStall_nonBranchJump(IF_ID_buffer_front.inst));
+	printf("required: %d\n", posiibleStall_nonBranchJump(IF_ID_buffer_front.inst));
 	IF_ID_buffer_front.control->print_all();
 
 	
 	printf("EX: ");
 	print_dissembled_inst(ID_EX_buffer_front.inst);
+	printf("write_destination: %d\n", EX_MEM_buffer_back.write_destination);
 	ID_EX_buffer_front.control->print_all();
 
 	printf("MEM: ");

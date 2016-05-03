@@ -17,7 +17,23 @@
 */
 CtrUnit::CtrUnit(void)
 {
-	used = Jump = RegDst = ALUop[0] = ALUop[1] = ALUSrc = Branch = MemRead = MemWrite = MemtoReg = RegWrite = false;
+	
+	used = false;
+
+	Jump = false;
+
+	RegDst = false;
+	ALUop[0] = false;
+	ALUop[1] = false;
+	ALUSrc = false;
+
+	Branch = false;
+	MemRead = false;
+	MemWrite = false;
+	
+	MemtoReg = false;
+	RegWrite = false;
+	//used = Jump = RegDst = ALUop[0] = ALUop[1] = ALUSrc = Branch = MemRead = MemWrite = MemtoReg = RegWrite = false;
 }
 
 void CtrUnit::change(unsigned int inst)
@@ -28,6 +44,25 @@ void CtrUnit::change(unsigned int inst)
 	unsigned char rt = (unsigned char) ( (inst >> 16) & 0x1f );
 	unsigned char shamt = (unsigned char) ( (inst >> 6) & 0x1f );
 	unsigned char rd = (unsigned char) ( (inst >> 11) & 0x1f );*/
+	if(inst == 0)
+	{
+		used = false;
+
+		Jump = false;
+
+		RegDst = false;
+		ALUop[0] = false;
+		ALUop[1] = false;
+		ALUSrc = false;
+
+		Branch = false;
+		MemRead = false;
+		MemWrite = false;
+		
+		MemtoReg = false;
+		RegWrite = false;
+		return;
+	}
 	
 	if(opcode == 0x00){
 		Jump = false;
@@ -246,7 +281,7 @@ void CtrUnit::print_all(void)
 	printf(", ALUop[2]=={%d, %d}", (int)ALUop[0], (int)ALUop[1]);
 	printf(", ALUSrc==%d", (int)ALUSrc);
 
-	printf("\n");
+	//printf("\n");
 
 	printf(", Branch==%d", (int)Branch);
 	printf(", MemRead==%d", (int)MemRead);

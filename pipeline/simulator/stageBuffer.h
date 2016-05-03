@@ -39,10 +39,12 @@ public:
 	int rt_data;
 	int extented_immediate;
 
+	unsigned char rs;
 	unsigned char rt;
 	unsigned char rd;
 
 	void put(void);		// needs implementation
+	void clearToNop(void);
 };
 
 class EX_MEM_Buffer

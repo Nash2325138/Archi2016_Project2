@@ -36,3 +36,34 @@ void ID_EX_Buffer::put(void)
 {
 	
 }
+
+void ID_EX_Buffer::clearToNop(void)
+{
+	/*	
+	unsigned int inst;
+	unsigned int PC_puls_4;
+	CtrUnit *control;
+
+	// for a lazy reason, the following 3 argument are forwarded to use project 1 code 
+	unsigned char opcode;
+	unsigned char funct;
+	unsigned char shamt;
+
+	int rs_data;
+	int rt_data;
+	int extented_immediate;
+
+	unsigned char rs;
+	unsigned char rt;
+	unsigned char rd;
+	*/
+	inst = 0;
+	PC_puls_4 = 0;
+	control->change(0);
+
+	opcode = funct = shamt = 0;
+
+	rs_data = rt_data = extented_immediate = 0;
+
+	rs = rt = rd = 0;
+}

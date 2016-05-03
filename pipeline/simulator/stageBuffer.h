@@ -20,7 +20,7 @@ public:
 	unsigned short immediate;
 	unsigned int address;
 
-	void put(unsigned int inst_in, CtrUnit *control_in, unsigned int PC_p_4);
+	void put(unsigned int inst_in, unsigned int PC_p_4);
 };
 
 class ID_EX_Buffer

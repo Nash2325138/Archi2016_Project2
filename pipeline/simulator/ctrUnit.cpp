@@ -30,6 +30,7 @@ void CtrUnit::change(unsigned int inst)
 	unsigned char rd = (unsigned char) ( (inst >> 11) & 0x1f );*/
 	
 	if(opcode == 0x00){
+		Jump = false;
 		RegDst = true;
 		// ALUop[] = {1, 0} means ALU neads funct to know what to perform 
 		ALUop[0] = false;
@@ -83,11 +84,14 @@ void CtrUnit::change(unsigned int inst)
 
 			case 0x08:	//jr
 				RegWrite = false;
+				Jump = true;
 				break;
 
 			default: break;
 		}
 	} else {
+		Jump = false;
+
 		RegDst = false;
 		ALUSrc = true;
 
@@ -215,10 +219,12 @@ void CtrUnit::change(unsigned int inst)
 			//--------------------------- J type start -----------------------------//
 			case 0x02:	//j
 				RegWrite = false;
+				Jump = true;
 				break;
 
 			case 0x03:	//jal
 				RegWrite = true;
+				Jump = true;
 				break;
 			//--------------------------- J type end -----------------------------//
 

@@ -621,6 +621,26 @@ int stage_decode(void)
 			branch_jump_PC = ID_EX_buffer_back.PC_puls_4 + (4*ID_EX_buffer_back.extented_immediate);
 		}
 	}
+	if(IF_ID_buffer_front.control->Jump)
+	{
+		IF_Flush = true;
+		if(IF_ID_buffer_front.opcode == 0x00)
+		{
+			if(IF_ID_buffer_front.funct == 0x08)
+				branch_jump_PC = (int) regs->at(IF_ID_buffer_front.rs);
+			else
+				fprintf(stderr, "%s\n", "Jump signal is true but not a Jump instruction");
+		}
+		else if( IF_ID_buffer_front.opcode == 0x02 || IF_ID_buffer_front.opcode == 0x03)
+		{
+			unsigned int address = IF_ID_buffer_front.inst & 0x3ffffff;
+			branch_jump_PC = IF_ID_buffer_front.PC_puls_4 & 0xf0000000;
+			branch_jump_PC |= ( ((unsigned int)address) << 2 );
+		}
+		else
+			fprintf(stderr, "%s\n", "Jump signal is true but not a Jump instruction");
+		
+	}
 
 	ID_EX_buffer_back.rt = IF_ID_buffer_front.rt;
 	ID_EX_buffer_back.rd = IF_ID_buffer_front.rd;
@@ -883,6 +903,7 @@ int stage_execute(void)
 	EX_MEM_buffer_back.ALU_result = alu_result;
 	EX_MEM_buffer_back.rt_data = ID_EX_buffer_front.rt_data;	// needs forwarding if EX/MEM.RegWrite && ( ID/EX.rt==EX/MEM.write_destination )
 	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
+	EX_MEM_buffer_back.PC_puls_4 = ID_EX_buffer_front.PC_puls_4;
 
 	EX_MEM_buffer_back.write_destination = (ID_EX_buffer_front.control->RegDst) ? ID_EX_buffer_front.rd : ID_EX_buffer_front.rt;
 	return RV_NORMAL;
@@ -1047,6 +1068,7 @@ int stage_memory(void)
 	}
 	MEM_WB_buffer_back.ALU_result = EX_MEM_buffer_front.ALU_result;
 	MEM_WB_buffer_back.write_destination = EX_MEM_buffer_front.write_destination;
+	MEM_WB_buffer_back.PC_puls_4 = EX_MEM_buffer_front.PC_puls_4;
 
 	return RV_NORMAL;
 }
@@ -1068,6 +1090,14 @@ int stage_writeBack(void)
 	//printf("cycle %d: RegWrite==%d, MemtoReg==%d, write_destination==%d", cycle, MEM_WB_buffer_front.control->RegWrite, MEM_WB_buffer_front.control->MemtoReg, MEM_WB_buffer_front.write_destination);
 	if(MEM_WB_buffer_front.control->RegWrite)
 	{
+		int write_data;
+		
+		if(MEM_WB_buffer_front.control->Jump){
+			write_data = MEM_WB_buffer_front.PC_puls_4;
+			regs->at(31) = write_data;
+			return RV_NORMAL;
+		}
+
 		if(MEM_WB_buffer_front.write_destination==0){
 			if( (MEM_WB_buffer_front.inst & 0xf8000000)==0 ) {}		//NOP
 			else {
@@ -1075,8 +1105,11 @@ int stage_writeBack(void)
 				return RV_NORMAL;
 			}
 		}
-		int write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
-		regs->at(MEM_WB_buffer_front.write_destination) = write_data;
+		
+		else{
+			write_data = (MEM_WB_buffer_front.control->MemtoReg) ?  MEM_WB_buffer_front.memory_result : MEM_WB_buffer_front.ALU_result;
+			regs->at(MEM_WB_buffer_front.write_destination) = write_data;
+		}
 		//printf(", write_data==%d", write_data);
 	}
 	return RV_NORMAL;

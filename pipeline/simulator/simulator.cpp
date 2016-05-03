@@ -54,6 +54,29 @@ bool ID_stall;
 unsigned int branch_jump_PC;
 
 std::vector<unsigned int>* readImage(FILE *);
+
+void write_32bits_to_image(FILE *image, unsigned int number);
+void print_dissembled_inst(unsigned int inst);
+void print_buffer_front(void);
+CtrUnit * getEmptyCtrUnit(void);
+void inst_UpperString(unsigned int inst);
+bool isBranchInst(unsigned int inst);
+bool willBranch(unsigned int inst, int rs_data, int rt_data);
+
+void stage_fetch(void);
+
+int calc_AluValue1_src(unsigned int inst);
+int calc_AluValue2_src(unsigned int inst);
+int posiibleStall_nonBranchJump(unsigned int inst);
+void stall_action(void);
+int stage_decode(void);
+
+int stage_execute(void);
+int stage_memory(void);
+int stage_writeBack(void);
+
+void trigger(void);
+
 void readInput_initialize(void);
 void print_snapshot(void);
 int execute(void);
@@ -86,6 +109,27 @@ void print_dissembled_inst(unsigned int inst)
 	fclose(tempTxt);
 }
 
+void print_buffer_front(void)
+{
+	printf("ID: ");
+	print_dissembled_inst(IF_ID_buffer_front.inst);
+	printf("required: %d\n", posiibleStall_nonBranchJump(IF_ID_buffer_front.inst));
+	IF_ID_buffer_front.control->print_all();
+
+	
+	printf("EX: ");
+	print_dissembled_inst(ID_EX_buffer_front.inst);
+	ID_EX_buffer_front.control->print_all();
+
+	printf("MEM: ");
+	print_dissembled_inst(EX_MEM_buffer_front.inst);
+	EX_MEM_buffer_front.control->print_all();
+
+	printf("WB: ");
+	print_dissembled_inst(MEM_WB_buffer_front.inst);
+	MEM_WB_buffer_front.control->print_all();
+
+}
 CtrUnit * getEmptyCtrUnit(void)
 {
 	for(int i=0 ; i<30 ; i++){
@@ -741,25 +785,6 @@ int posiibleStall_nonBranchJump(unsigned int inst)
 		}
 		return retVal;
 	}
-}
-void print_buffer_front(void)
-{
-	printf("ID: ");
-	print_dissembled_inst(IF_ID_buffer_front.inst);
-	IF_ID_buffer_front.control->print_all();
-	
-	printf("EX: ");
-	print_dissembled_inst(ID_EX_buffer_front.inst);
-	ID_EX_buffer_front.control->print_all();
-
-	printf("MEM: ");
-	print_dissembled_inst(EX_MEM_buffer_front.inst);
-	EX_MEM_buffer_front.control->print_all();
-
-	printf("WB: ");
-	print_dissembled_inst(MEM_WB_buffer_front.inst);
-	MEM_WB_buffer_front.control->print_all();
-
 }
 void stall_action(void)
 {
@@ -1516,7 +1541,7 @@ int stage_writeBack(void)
 	{
 		int write_data;
 		if(MEM_WB_buffer_front.write_destination==0){
-			if( (MEM_WB_buffer_front.inst & 0xf8000000)==0 ) {}		//NOP
+			if( (MEM_WB_buffer_front.inst & 0xfC01ffff)==0 ) {}		//NOP
 			else {
 				fprintf(error_dump, "In cycle %d: Write $0 Error\n", cycle);
 				return RV_NORMAL;

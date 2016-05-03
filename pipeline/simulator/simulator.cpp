@@ -1331,6 +1331,15 @@ int stage_execute(void)
 	}
 	EX_MEM_buffer_back.ALU_result = alu_result;
 	EX_MEM_buffer_back.rt_data = ID_EX_buffer_front.rt_data;	// needs forwarding if EX/MEM.RegWrite && ( ID/EX.rt==EX/MEM.write_destination )
+	if(ID_EX_buffer_front.control->MemWrite && EX_MEM_buffer_front.control->RegWrite && EX_MEM_buffer_front.write_destination != 0)
+	{	// load word
+		if(EX_MEM_buffer_front.write_destination == ID_EX_buffer_front.rt)
+		{
+			EX_MEM_buffer_back.rt_data = EX_MEM_buffer_front.ALU_result;
+			sprintf(temp, " fwd_EX-DM_rt_$%d", ID_EX_buffer_front.rt);
+			strcat(snapshotWriterBuffer[2], temp);
+		}
+	}
 	EX_MEM_buffer_back.opcode = ID_EX_buffer_front.opcode;
 	EX_MEM_buffer_back.PC_puls_4 = ID_EX_buffer_front.PC_puls_4;
 
@@ -1622,13 +1631,13 @@ int main(int argc, char const *argv[])
 		stage_fetch();
 		//printf("%s\n", snapshotWriterBuffer[0]);
 
-
+/*
 		if(cycle==34)
 		{
 			printf("\ncycle %d:\n", cycle);
 			print_buffer_front();
 		}
-
+*/
 
 		trigger();
 
